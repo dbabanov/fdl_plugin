@@ -1,0 +1,7 @@
+{
+  "prefix": "fdlPlugin",
+  "paths": {
+    "fdlPlugin": "."
+  },
+  "translations": ["translations/ja-JP.json"]
+}

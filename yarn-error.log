@@ -1,0 +1,55 @@
+Arguments: 
+  /Users/dbabanov/.nvm/versions/node/v20.18.3/bin/node /Users/dbabanov/.cache/node/corepack/v1/yarn/1.22.19/bin/yarn.js add codemirror react-codemirror2
+
+PATH: 
+  /Users/dbabanov/.nvm/versions/node/v20.18.3/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/Applications/VMware Fusion.app/Contents/Public:/Users/dbabanov/.nvm/versions/node/v20.18.3/bin:/Users/dbabanov/Library/Application Support/Code/User/globalStorage/github.copilot-chat/debugCommand
+
+Yarn version: 
+  1.22.19
+
+Node version: 
+  20.18.3
+
+Platform: 
+  darwin arm64
+
+Trace: 
+  Error: https://registry.yarnpkg.com/@osd%2fplugin-helpers: Not found
+      at params.callback [as _callback] (/Users/dbabanov/.cache/node/corepack/v1/yarn/1.22.19/lib/cli.js:66145:18)
+      at self.callback (/Users/dbabanov/.cache/node/corepack/v1/yarn/1.22.19/lib/cli.js:140890:22)
+      at Request.emit (node:events:518:28)
+      at Request.<anonymous> (/Users/dbabanov/.cache/node/corepack/v1/yarn/1.22.19/lib/cli.js:141862:10)
+      at Request.emit (node:events:518:28)
+      at IncomingMessage.<anonymous> (/Users/dbabanov/.cache/node/corepack/v1/yarn/1.22.19/lib/cli.js:141784:12)
+      at Object.onceWrapper (node:events:632:28)
+      at IncomingMessage.emit (node:events:530:35)
+      at endReadableNT (node:internal/streams/readable:1698:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
+
+npm manifest: 
+  {
+    "name": "fdlPlugin",
+    "version": "0.0.0",
+    "private": true,
+    "scripts": {
+      "build": "yarn plugin-helpers build",
+      "plugin-helpers": "../../scripts/use_node ../../scripts/plugin_helpers",
+      "osd": "../../scripts/use_node ../../scripts/osd"
+    },
+    "devDependencies": {
+      "@osd/plugin-helpers": "2.11.0",
+      "@types/codemirror": "5.60.5"
+    },
+    "dependencies": {
+      "rxjs": "^7.5.5",
+      "codemirror": "^5.65.0",
+      "react-codemirror2": "^7.2.1"
+    },
+    "license": "Apache-2.0"
+  }
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  No lockfile

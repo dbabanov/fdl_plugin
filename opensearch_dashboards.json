@@ -1,0 +1,15 @@
+{
+  "id": "fdlPlugin",
+  "version": "1.0.0",
+  "opensearchDashboardsVersion": "opensearchDashboards",
+  "server": true,
+  "ui": true,
+  "requiredPlugins": [
+    "navigation",
+    "data",
+    "opensearchDashboardsReact",
+    "opensearchDashboardsUtils",
+    "savedObjects"],
+  "optionalPlugins": []
+  
+}
