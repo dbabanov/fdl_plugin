@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { AppMountParameters, CoreStart } from '../../../src/core/public';
 import { AppPluginStartDependencies } from './types';
-import { FdlPluginApp } from './components/app';
+import { Explorer } from './components/explorer/explorer';
 
 export const renderApp = (
   { notifications, http }: CoreStart,
@@ -10,12 +10,7 @@ export const renderApp = (
   { appBasePath, element }: AppMountParameters
 ) => {
   ReactDOM.render(
-    <FdlPluginApp
-      basename={appBasePath}
-      notifications={notifications}
-      http={http}
-      navigation={navigation}
-    />,
+    <Explorer http={http} notifications={notifications} />,
     element
   );
 
