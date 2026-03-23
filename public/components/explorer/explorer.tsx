@@ -50,7 +50,6 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [explorerData, setExplorerData] = useState<ExplorerData | null>(null);
   const [availableFields, setAvailableFields] = useState<IField[]>([]);
-  const [selectedFields, setSelectedFields] = useState<IField[]>([]);
   const [selectedTabId, setSelectedTabId] = useState<string>('events_messages');
   const [startTime, setStartTime] = useState<string>('now-15m');
   const [endTime, setEndTime] = useState<string>('now');
@@ -173,16 +172,6 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
     }
   }, [tempQuery, startTime, endTime, availableFields, pplService, notifications]);
 
-  const handleAddField = (field: IField) => {
-    if (!selectedFields.find((f) => f.name === field.name)) {
-      setSelectedFields([...selectedFields, field]);
-    }
-  };
-
-  const handleRemoveField = (field: IField) => {
-    setSelectedFields(selectedFields.filter((f) => f.name !== field.name));
-  };
-
   const escapePPLString = (value: string): string =>
     `'${value.replace(/'/g, "''")}'`;
 
@@ -198,6 +187,15 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
         return `where ${predicate}`;
       }
       return `${trimmed} | where ${predicate}`;
+    });
+  };
+
+  const handleAddTopValuesCommand = (fieldName: string) => {
+    setTempQuery((prev) => {
+      const trimmed = prev.trim();
+      const command = `top 20 \`${fieldName}\``;
+      if (!trimmed) return command;
+      return `${trimmed} | ${command}`;
     });
   };
 
@@ -337,10 +335,8 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
             <div>
               <FieldsSidebar
                 availableFields={availableFields}
-                selectedFields={selectedFields}
-                onAddField={handleAddField}
-                onRemoveField={handleRemoveField}
                 onAddFilter={handleAddFilter}
+                onAddTopValuesCommand={handleAddTopValuesCommand}
                 explorerData={explorerData}
               />
             </div>
