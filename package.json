@@ -3,20 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "yarn plugin-helpers build",
-    "plugin-helpers": "../../scripts/use_node ../../scripts/plugin_helpers",
+    "build": "yarn osd build",
     "osd": "../../scripts/use_node ../../scripts/osd"
   },
   "devDependencies": {
-    "@osd/plugin-helpers": "2.11.0",
     "@types/codemirror": "5.60.5"
   },
   "dependencies": {
-    "rxjs": "^7.5.5",
+    "rxjs": "^6.5.5",
     "codemirror": "^5.65.0",
     "react-codemirror2": "^7.2.1",
     "lodash": "^4.17.21",
-    "moment": "^2.29.4"
+    "moment": "^2.24.0"
   },
   "license": "Apache-2.0"
 }

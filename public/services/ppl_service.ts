@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CoreStart } from '../../../src/core/public';
+import type { CoreStart } from 'opensearch-dashboards/public';
 
 const PPL_BASE = '/api/ppl';
 const PPL_SEARCH = '/search';

@@ -16,7 +16,7 @@ setting up your development environment.
       <dd>Execute this to install node_modules and setup the dependencies in your plugin and in OpenSearch Dashboards
       </dd>
 
-      <dt><code>yarn plugin-helpers build</code></dt>
+      <dt><code>yarn build</code></dt>
       <dd>Execute this to create a distributable version of this plugin that can be installed in OpenSearch Dashboards
       </dd>
     </dl>
