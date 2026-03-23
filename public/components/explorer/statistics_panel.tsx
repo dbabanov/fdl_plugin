@@ -12,37 +12,13 @@ import {
 } from '@elastic/eui';
 
 interface StatisticsPanelProps {
-  totalHits: number;
-  startTime: string;
   endTime: string;
-  isLoading: boolean;
 }
 
-export const StatisticsPanel: React.FC<StatisticsPanelProps> = ({
-  totalHits,
-  startTime,
-  endTime,
-  isLoading,
-}) => {
+export const StatisticsPanel: React.FC<StatisticsPanelProps> = ({ endTime }) => {
   return (
     <EuiPanel paddingSize="s">
       <EuiFlexGroup gutterSize="l">
-        <EuiFlexItem grow={false}>
-          <EuiStat
-            title={isLoading ? '...' : totalHits.toLocaleString()}
-            description="Количество событий"
-            titleSize="s"
-            textAlign="left"
-          />
-        </EuiFlexItem>
-        <EuiFlexItem grow={false}>
-          <EuiStat
-            title={startTime}
-            description="От"
-            titleSize="xs"
-            textAlign="left"
-          />
-        </EuiFlexItem>
         <EuiFlexItem grow={false}>
           <EuiStat
             title={endTime}

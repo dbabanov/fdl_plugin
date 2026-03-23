@@ -50,7 +50,7 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
   const [explorerData, setExplorerData] = useState<ExplorerData | null>(null);
   const [availableFields, setAvailableFields] = useState<IField[]>([]);
   const [selectedFields, setSelectedFields] = useState<IField[]>([]);
-  const [selectedTabId, setSelectedTabId] = useState<string>('events');
+  const [selectedTabId, setSelectedTabId] = useState<string>('events_messages');
   const [startTime, setStartTime] = useState<string>('now-15m');
   const [endTime, setEndTime] = useState<string>('now');
   // Used for rendering/time display in the UI (timeline, grids). Time filtering always uses @timestamp.
@@ -183,7 +183,6 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
             <EventsMessagesView
               events={explorerData.jsonData}
               totalHits={explorerData.total || explorerData.datarows.length}
-              timestampField={timestampField}
             />
           ) : (
             <EuiPanel>
@@ -291,10 +290,7 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
         {/* Part 2: Statistics and Timeline */}
         <div style={{ padding: '0 16px' }}>
           <StatisticsPanel
-            totalHits={explorerData?.total || explorerData?.datarows?.length || 0}
-            startTime={startTime}
             endTime={endTime}
-            isLoading={isLoading}
           />
           <EuiSpacer size="s" />
           <Timeline
