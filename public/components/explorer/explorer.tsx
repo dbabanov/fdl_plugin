@@ -22,6 +22,7 @@ import { SearchBar } from './search_bar';
 import { FieldsSidebar } from './fields_sidebar';
 import { DataGrid } from './data_grid';
 import { RawEventsView } from './raw_events_view';
+import { EventsMessagesView } from './events_messages_view';
 import { Timeline } from './timeline';
 import { StatisticsPanel } from './statistics_panel';
 import { preprocessQuery } from '../../utils/ppl_query_utils';
@@ -168,8 +169,36 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
 
   const tabs: EuiTabbedContentTab[] = [
     {
-      id: 'events',
+      id: 'events_messages',
       name: 'События',
+      content: (
+        <div>
+          {isLoading ? (
+            <EuiPanel>
+              <EuiLoadingSpinner size="l" />
+              <EuiSpacer size="m" />
+              <EuiText textAlign="center">Running query...</EuiText>
+            </EuiPanel>
+          ) : explorerData && explorerData.jsonData.length > 0 ? (
+            <EventsMessagesView
+              events={explorerData.jsonData}
+              totalHits={explorerData.total || explorerData.datarows.length}
+              timestampField={timestampField}
+            />
+          ) : (
+            <EuiPanel>
+              <EuiText textAlign="center">
+                <h2>No results</h2>
+                <p>Enter a PPL query and click Run to see results</p>
+              </EuiText>
+            </EuiPanel>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'events',
+      name: 'Json',
       content: (
         <div>
           {isLoading ? (
