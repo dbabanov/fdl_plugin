@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   EuiPage,
   EuiPageBody,
@@ -24,7 +24,6 @@ import { DataGrid } from './data_grid';
 import { RawEventsView } from './raw_events_view';
 import { EventsMessagesView } from './events_messages_view';
 import { Timeline } from './timeline';
-import { StatisticsPanel } from './statistics_panel';
 import { preprocessQuery } from '../../utils/ppl_query_utils';
 
 interface IField {
@@ -43,6 +42,8 @@ interface ExplorerProps {
   http: CoreStart['http'];
   notifications: CoreStart['notifications'];
 }
+
+const LAST_RUN_STORAGE_KEY = 'fdl_plugin:last_run_query_state';
 
 export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
   const [tempQuery, setTempQuery] = useState<string>('');
@@ -82,6 +83,28 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
 
   const TIME_FILTER_FIELD = '@timestamp';
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const raw = window.localStorage.getItem(LAST_RUN_STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { query?: string; startTime?: string; endTime?: string };
+
+      if (typeof saved.query === 'string') {
+        setTempQuery(saved.query);
+      }
+      if (typeof saved.startTime === 'string') {
+        setStartTime(saved.startTime);
+      }
+      if (typeof saved.endTime === 'string') {
+        setEndTime(saved.endTime);
+      }
+    } catch {
+      // Ignore malformed localStorage payloads and continue with defaults.
+    }
+  }, []);
+
   const handleQuerySearch = useCallback(async () => {
     if (!tempQuery.trim()) {
       notifications.toasts.addWarning({
@@ -94,6 +117,17 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
     setIsLoading(true);
 
     try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(
+          LAST_RUN_STORAGE_KEY,
+          JSON.stringify({
+            query: tempQuery.trim(),
+            startTime,
+            endTime,
+          })
+        );
+      }
+
       // Build the query with time range filter.
       // Requirement: always use @timestamp for the time filter injection.
       const queryWithTimeFilter = preprocessQuery({
@@ -287,17 +321,13 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
           />
         </div>
 
-        {/* Part 2: Statistics and Timeline */}
-        <div style={{ padding: '0 16px' }}>
-          <StatisticsPanel
-            endTime={endTime}
-          />
-          <EuiSpacer size="s" />
+        {/* Part 2: Timeline */}
+        <EuiPanel paddingSize="none" style={{ margin: '0 16px' }}>
           <Timeline
             data={explorerData?.jsonData}
             timeField={timestampField}
           />
-        </div>
+        </EuiPanel>
         <EuiSpacer size="m" />
 
         {/* Part 3 & 4: Fields Sidebar and Events/Table side by side */}

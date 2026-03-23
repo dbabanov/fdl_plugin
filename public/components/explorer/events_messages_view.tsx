@@ -6,11 +6,11 @@ import React, { useMemo, useState } from 'react';
 import {
   EuiPanel,
   EuiText,
-  EuiCodeBlock,
-  EuiButton,
+  EuiButtonEmpty,
+  EuiContextMenuItem,
+  EuiContextMenuPanel,
   EuiPagination,
-  EuiFormRow,
-  EuiSelect,
+  EuiPopover,
   EuiFlexGroup,
   EuiFlexItem,
   EuiSpacer,
@@ -20,14 +20,9 @@ import moment from 'moment';
 interface EventsMessagesViewProps {
   events: any[];
   totalHits: number;
-  /**
-   * Optional field to display under each item (e.g. '@timestamp').
-   * Not required for the "message" rendering logic.
-   */
-  timestampField?: string;
 }
 
-const DATE_DISPLAY_FORMAT = 'MMM D, YYYY @ HH:mm:ss.SSS';
+const TIME_DISPLAY_FORMAT = 'YYYY-MM-DD HH:mm:ss.SSS';
 const DEFAULT_EVENTS_PER_PAGE = 10;
 const EVENTS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200];
 const DEFAULT_PREVIEW_LINES = 10;
@@ -36,11 +31,14 @@ const PREVIEW_LINES_OPTIONS = [5, 10, 15, 20, 30, 50, 100, 'Full'] as const;
 export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
   events,
   totalHits,
-  timestampField,
 }) => {
   const [pageIndex, setPageIndex] = useState(0);
   const [eventsPerPage, setEventsPerPage] = useState(DEFAULT_EVENTS_PER_PAGE);
   const [previewLines, setPreviewLines] = useState<number | 'Full'>(DEFAULT_PREVIEW_LINES);
+  const [isFieldMenuOpen, setIsFieldMenuOpen] = useState(false);
+  const [isPreviewMenuOpen, setIsPreviewMenuOpen] = useState(false);
+  const [isPerPageMenuOpen, setIsPerPageMenuOpen] = useState(false);
+  const [selectedDisplayField, setSelectedDisplayField] = useState('message');
 
   const { pageEvents, totalPages } = useMemo(() => {
     const safeEvents = events ?? [];
@@ -54,6 +52,19 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
       totalPages: pages,
     };
   }, [events, pageIndex, eventsPerPage]);
+
+  const displayFields = useMemo(() => {
+    const fields = new Set<string>();
+    (events || []).forEach((event) => {
+      Object.keys(event || {}).forEach((key) => fields.add(key));
+    });
+
+    const allFields = Array.from(fields).sort((a, b) => a.localeCompare(b));
+    if (!allFields.includes('message')) {
+      return ['message', ...allFields];
+    }
+    return ['message', ...allFields.filter((f) => f !== 'message')];
+  }, [events]);
 
   const handleEventsPerPageChange = (value: string) => {
     const newPerPage = parseInt(value, 10);
@@ -70,23 +81,22 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
   };
 
   const getTimestamp = (event: any): string | null => {
-    if (!timestampField) return null;
-    const timestamp = event?.[timestampField];
+    const timestamp = event?.['@timestamp'];
     if (!timestamp) return null;
     try {
-      return moment(timestamp).format(DATE_DISPLAY_FORMAT);
+      return moment(timestamp).format(TIME_DISPLAY_FORMAT);
     } catch {
       return String(timestamp);
     }
   };
 
-  const renderEventContent = (event: any): { kind: 'message'; text: string } | { kind: 'json'; json: string } => {
-    // "If object does not have message field, show all json."
-    const hasOwnMessageField = event && Object.prototype.hasOwnProperty.call(event, 'message');
-    const messageValue = hasOwnMessageField ? event.message : undefined;
+  const renderEventContent = (event: any): { kind: 'field'; text: string } | { kind: 'json'; json: string } => {
+    // Show selected field value; if field is missing, fallback to full JSON.
+    const hasSelectedField = event && Object.prototype.hasOwnProperty.call(event, selectedDisplayField);
+    const fieldValue = hasSelectedField ? event[selectedDisplayField] : undefined;
 
-    if (messageValue !== undefined && messageValue !== null) {
-      return { kind: 'message', text: String(messageValue) };
+    if (fieldValue !== undefined && fieldValue !== null) {
+      return { kind: 'field', text: String(fieldValue) };
     }
 
     try {
@@ -103,14 +113,21 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
     return lines.slice(0, previewLines).join('\n') + '\n...';
   };
 
+  const renderAsLines = (text: string): JSX.Element => {
+    const lines = text.split('\n');
+    return (
+      <>
+        {lines.map((line, index) => (
+          <div key={index}>{line || '\u00A0'}</div>
+        ))}
+      </>
+    );
+  };
+
   const exportToCsv = () => {
     if (!events || events.length === 0) return;
 
-    const allFieldNames = new Set<string>();
-    events.forEach((event) => {
-      Object.keys(event ?? {}).forEach((key) => allFieldNames.add(key));
-    });
-    const fieldNames = Array.from(allFieldNames);
+    const exportField = selectedDisplayField;
     const escapeCsvValue = (value: any): string => {
       if (value === null || value === undefined) return '';
       const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
@@ -120,8 +137,8 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
       return stringValue;
     };
 
-    const headers = fieldNames.join(',');
-    const rows = events.map((event) => fieldNames.map((f) => escapeCsvValue(event?.[f])).join(','));
+    const headers = exportField;
+    const rows = events.map((event) => escapeCsvValue(event?.[exportField]));
     const csvContent = [headers, ...rows].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -138,111 +155,228 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
 
   return (
     <EuiPanel paddingSize="s">
-      <EuiFlexGroup justifyContent="spaceBetween" alignItems="center" gutterSize="m">
-        <EuiFlexItem grow={false}>
-          <EuiText size="s" color="subdued">
-            <strong>{totalHits}</strong> {totalHits === 1 ? 'event' : 'events'}
-            {events.length < totalHits && ` (showing ${events.length})`}
-          </EuiText>
-        </EuiFlexItem>
-        <EuiFlexItem grow={false}>
-          <EuiFormRow label="Preview lines" display="rowCompressed">
-            <EuiSelect
-              value={previewLines.toString()}
-              onChange={(e) => handlePreviewLinesChange(e.target.value)}
-              options={PREVIEW_LINES_OPTIONS.map((opt) => ({
-                value: opt.toString(),
-                text: opt.toString(),
-              }))}
-              compressed
-              style={{ minWidth: '120px' }}
-            />
-          </EuiFormRow>
-        </EuiFlexItem>
-        <EuiFlexItem grow={false}>
-          <EuiFormRow label="Events per page" display="rowCompressed">
-            <EuiSelect
-              value={eventsPerPage.toString()}
-              onChange={(e) => handleEventsPerPageChange(e.target.value)}
-              options={EVENTS_PER_PAGE_OPTIONS.map((opt) => ({
-                value: opt.toString(),
-                text: opt.toString(),
-              }))}
-              compressed
-              style={{ minWidth: '140px' }}
-            />
-          </EuiFormRow>
-        </EuiFlexItem>
-        <EuiFlexItem grow={false}>
-          <EuiButton
-            iconType="download"
-            onClick={exportToCsv}
-            size="s"
-            isDisabled={!events || events.length === 0}
-          >
-            Export CSV
-          </EuiButton>
-        </EuiFlexItem>
-      </EuiFlexGroup>
-
-      <EuiSpacer size="s" />
-
-      {pageEvents.map((event, idx) => {
-        const globalIndex = pageIndex * eventsPerPage + idx;
-        const timestamp = getTimestamp(event);
-        const content = renderEventContent(event);
-
-        return (
-          <div key={globalIndex} style={{ marginBottom: '12px' }}>
-            <EuiPanel paddingSize="s" style={{ backgroundColor: '#f5f7fa' }}>
-              <EuiFlexGroup direction="column" gutterSize="xs">
-                <EuiFlexGroup gutterSize="s" alignItems="center" justifyContent="spaceBetween">
-                  <EuiFlexItem grow={false}>
-                    <EuiFlexGroup gutterSize="s" alignItems="center">
-                      {timestamp && (
-                        <EuiFlexItem grow={false}>
-                          <EuiText size="xs" color="subdued" style={{ fontWeight: 'bold' }}>
-                            {timestamp}
-                          </EuiText>
-                        </EuiFlexItem>
-                      )}
-                      <EuiFlexItem grow={false}>
-                        <EuiText size="xs" color="subdued">
-                          #{globalIndex + 1}
-                        </EuiText>
-                      </EuiFlexItem>
-                    </EuiFlexGroup>
-                  </EuiFlexItem>
-                </EuiFlexGroup>
-
-                <EuiFlexItem>
-                  {content.kind === 'message' ? (
-                    <EuiCodeBlock
-                      language="text"
-                      fontSize="s"
-                      paddingSize="s"
-                      isCopyable={false}
-                      style={{ maxHeight: '220px', overflowY: 'auto', whiteSpace: 'pre-wrap' }}
+      <div
+        style={{
+          border: '1px solid #d3dae6',
+          borderRadius: '4px',
+          overflow: 'hidden',
+          backgroundColor: '#ffffff',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '6px 10px',
+            borderBottom: '1px solid #d3dae6',
+            backgroundColor: '#f5f7fa',
+            fontSize: '12px',
+            color: '#69707d',
+          }}
+        >
+          <div style={{ display: 'flex', gap: '14px' }}>
+            <EuiPopover
+              button={
+                <EuiButtonEmpty
+                  size="xs"
+                  iconType="arrowDown"
+                  iconSide="right"
+                  onClick={() => setIsFieldMenuOpen((v) => !v)}
+                  flush="both"
+                >
+                  {`Event: ${selectedDisplayField}`}
+                </EuiButtonEmpty>
+              }
+              isOpen={isFieldMenuOpen}
+              closePopover={() => setIsFieldMenuOpen(false)}
+              panelPaddingSize="s"
+              anchorPosition="downLeft"
+            >
+              <div style={{ maxHeight: '280px', overflowY: 'auto', minWidth: '220px' }}>
+                <EuiContextMenuPanel
+                  size="s"
+                  items={displayFields.map((fieldName) => (
+                    <EuiContextMenuItem
+                      key={fieldName}
+                      icon={selectedDisplayField === fieldName ? 'check' : 'empty'}
+                      onClick={() => {
+                        setSelectedDisplayField(fieldName);
+                        setIsFieldMenuOpen(false);
+                      }}
                     >
-                      {getPreviewText(content.text)}
-                    </EuiCodeBlock>
-                  ) : (
-                    <EuiCodeBlock
-                      language="json"
-                      fontSize="s"
-                      paddingSize="s"
-                      isCopyable
-                      style={{ maxHeight: '400px', overflowY: 'auto' }}
-                    >
-                      {getPreviewText(content.json)}
-                    </EuiCodeBlock>
-                  )}
-                </EuiFlexItem>
-              </EuiFlexGroup>
-            </EuiPanel>
+                      {fieldName}
+                    </EuiContextMenuItem>
+                  ))}
+                />
+              </div>
+            </EuiPopover>
+            <EuiPopover
+              button={
+                <EuiButtonEmpty
+                  size="xs"
+                  iconType="arrowDown"
+                  iconSide="right"
+                  onClick={() => setIsPreviewMenuOpen((v) => !v)}
+                  flush="both"
+                >
+                  {`Preview lines: ${previewLines}`}
+                </EuiButtonEmpty>
+              }
+              isOpen={isPreviewMenuOpen}
+              closePopover={() => setIsPreviewMenuOpen(false)}
+              panelPaddingSize="s"
+              anchorPosition="downLeft"
+            >
+              <div style={{ maxHeight: '280px', overflowY: 'auto', minWidth: '180px' }}>
+                <EuiContextMenuPanel
+                  size="s"
+                  items={PREVIEW_LINES_OPTIONS.map((option) => {
+                    const value = option.toString();
+                    const selected = previewLines.toString() === value;
+                    return (
+                      <EuiContextMenuItem
+                        key={value}
+                        icon={selected ? 'check' : 'empty'}
+                        onClick={() => {
+                          handlePreviewLinesChange(value);
+                          setIsPreviewMenuOpen(false);
+                        }}
+                      >
+                        {value}
+                      </EuiContextMenuItem>
+                    );
+                  })}
+                />
+              </div>
+            </EuiPopover>
+            <EuiPopover
+              button={
+                <EuiButtonEmpty
+                  size="xs"
+                  iconType="arrowDown"
+                  iconSide="right"
+                  onClick={() => setIsPerPageMenuOpen((v) => !v)}
+                  flush="both"
+                >
+                  {`Events per page: ${eventsPerPage}`}
+                </EuiButtonEmpty>
+              }
+              isOpen={isPerPageMenuOpen}
+              closePopover={() => setIsPerPageMenuOpen(false)}
+              panelPaddingSize="s"
+              anchorPosition="downLeft"
+            >
+              <div style={{ maxHeight: '280px', overflowY: 'auto', minWidth: '180px' }}>
+                <EuiContextMenuPanel
+                  size="s"
+                  items={EVENTS_PER_PAGE_OPTIONS.map((option) => {
+                    const value = option.toString();
+                    const selected = eventsPerPage.toString() === value;
+                    return (
+                      <EuiContextMenuItem
+                        key={value}
+                        icon={selected ? 'check' : 'empty'}
+                        onClick={() => {
+                          handleEventsPerPageChange(value);
+                          setIsPerPageMenuOpen(false);
+                        }}
+                      >
+                        {value}
+                      </EuiContextMenuItem>
+                    );
+                  })}
+                />
+              </div>
+            </EuiPopover>
+            <EuiButtonEmpty
+              size="xs"
+              iconType="download"
+              onClick={exportToCsv}
+              isDisabled={!events || events.length === 0}
+              flush="both"
+            >
+              Export CSV
+            </EuiButtonEmpty>
           </div>
-        );
-      })}
+          <div />
+        </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '24px 220px 1fr',
+            gap: '0',
+            borderBottom: '1px solid #d3dae6',
+            backgroundColor: '#f5f7fa',
+            fontSize: '12px',
+            color: '#69707d',
+            fontWeight: 600,
+          }}
+        >
+          <div style={{ padding: '6px 8px' }}>i</div>
+          <div style={{ padding: '6px 10px', borderLeft: '1px solid #e5e9f0' }}>Time</div>
+          <div style={{ padding: '6px 10px', borderLeft: '1px solid #e5e9f0' }}>Event</div>
+        </div>
+
+        {pageEvents.map((event, idx) => {
+          const globalIndex = pageIndex * eventsPerPage + idx;
+          const timestamp = getTimestamp(event) || '-';
+          const content = renderEventContent(event);
+          const renderedText =
+            content.kind === 'field' ? getPreviewText(content.text) : getPreviewText(content.json);
+
+          return (
+            <div
+              key={globalIndex}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '24px 220px 1fr',
+                gap: '0',
+                borderBottom: '1px solid #eef1f7',
+              }}
+            >
+              <div
+                style={{
+                  padding: '8px 6px',
+                  fontSize: '11px',
+                  color: '#98a2b3',
+                  textAlign: 'center',
+                }}
+              >
+                {'>'}
+              </div>
+              <div
+                style={{
+                  padding: '8px 10px',
+                  fontSize: '12px',
+                  color: '#69707d',
+                  borderRight: '1px solid #eef1f7',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+                title={timestamp}
+              >
+                {timestamp}
+              </div>
+              <div
+                style={{
+                  padding: '8px 10px',
+                  fontFamily:
+                    '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace',
+                  fontSize: '12px',
+                  lineHeight: 1.35,
+                  color: '#343741',
+                  overflowX: 'auto',
+                  borderLeft: '1px solid #eef1f7',
+                }}
+              >
+                {renderAsLines(renderedText)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       {totalPages > 1 && (
         <>
