@@ -19,6 +19,7 @@ import {
   EuiBadge,
   EuiButton,
   EuiHorizontalRule,
+  EuiToolTip,
 } from '@elastic/eui';
 import { I18nProvider } from '@osd/i18n/react';
 import isEmpty from 'lodash/isEmpty';
@@ -204,14 +205,12 @@ export const FieldsSidebar: React.FC<FieldsSidebarProps> = ({
                     <div style={{ minWidth: '340px', maxWidth: '420px', maxHeight: '420px', overflowY: 'auto' }}>
                       <EuiText size="s" style={{ fontWeight: 'bold', marginBottom: '8px' }}>
                         {field.name}
-                        {field.uniqueValueCount !== undefined && (
-                          <EuiText size="xs" color="subdued" style={{ marginLeft: '8px', fontWeight: 'normal' }}>
-                            ({field.uniqueValueCount > 100 ? '100+' : field.uniqueValueCount} values)
-                          </EuiText>
-                        )}
                       </EuiText>
                       <EuiText size="xs" color="subdued" style={{ marginBottom: '8px' }}>
-                        Event coverage: {Math.round((field.coverage || 0) * 100)}%
+                        {field.uniqueValueCount !== undefined
+                          ? `${field.uniqueValueCount > 100 ? '100+' : field.uniqueValueCount} values`
+                          : '0 values'}
+                        {` | Event coverage: ${Math.round((field.coverage || 0) * 100)}%`}
                       </EuiText>
                       <EuiButton
                         size="s"
@@ -221,32 +220,53 @@ export const FieldsSidebar: React.FC<FieldsSidebarProps> = ({
                         Top values
                       </EuiButton>
                       <EuiHorizontalRule margin="s" />
-                      <EuiText size="xs" color="subdued" style={{ marginBottom: '12px' }}>
+                      <EuiText size="xs" color="subdued" style={{ marginBottom: '8px' }}>
                         Top 10 values
                       </EuiText>
                       {field.topValues.length > 0 ? (
-                        <EuiListGroup gutterSize="none">
-                          {field.topValues.map((item, index) => (
-                            <EuiListGroupItem
-                              key={`${field.name}-${index}`}
-                              label={
-                                <EuiFlexGroup justifyContent="spaceBetween" alignItems="center" gutterSize="s">
-                                  <EuiFlexItem grow={true}>
-                                    <EuiText size="xs" style={{ wordBreak: 'break-word' }}>
-                                      {item.value.length > 100 ? `${item.value.substring(0, 100)}...` : item.value}
-                                    </EuiText>
-                                  </EuiFlexItem>
-                                  <EuiFlexItem grow={false}>
-                                    <EuiBadge color="hollow">{item.count}</EuiBadge>
-                                  </EuiFlexItem>
-                                </EuiFlexGroup>
-                              }
-                              size="xs"
-                              onClick={() => onAddFilter(field.name, item.value)}
-                              style={{ cursor: 'pointer' }}
-                            />
-                          ))}
-                        </EuiListGroup>
+                        <div>
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 70px 60px',
+                              columnGap: '8px',
+                              padding: '0 4px 6px 4px',
+                              borderBottom: '1px solid #D3DAE6',
+                              marginBottom: '4px',
+                            }}
+                          >
+                            <EuiText size="xs" color="subdued">Values</EuiText>
+                            <EuiText size="xs" color="subdued">Count</EuiText>
+                            <EuiText size="xs" color="subdued">%</EuiText>
+                          </div>
+                          {field.topValues.map((item, index) => {
+                            const percent = field.nonNullCount > 0 ? (item.count / field.nonNullCount) * 100 : 0;
+                            return (
+                              <div
+                                key={`${field.name}-${index}`}
+                                onClick={() => onAddFilter(field.name, item.value)}
+                                style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: '1fr 70px 60px',
+                                  columnGap: '8px',
+                                  padding: '6px 4px',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid #EEF1F7',
+                                }}
+                              >
+                                <EuiToolTip content={item.value}>
+                                  <EuiText size="xs" style={{ wordBreak: 'break-word' }}>
+                                    {item.value.length > 100 ? `${item.value.substring(0, 100)}...` : item.value}
+                                  </EuiText>
+                                </EuiToolTip>
+                                <EuiText size="xs">
+                                  <EuiBadge color="hollow">{item.count}</EuiBadge>
+                                </EuiText>
+                                <EuiText size="xs">{percent.toFixed(2)}%</EuiText>
+                              </div>
+                            );
+                          })}
+                        </div>
                       ) : (
                         <EuiText size="xs" color="subdued">No values</EuiText>
                       )}

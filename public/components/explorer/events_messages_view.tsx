@@ -39,6 +39,7 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
   const [isPreviewMenuOpen, setIsPreviewMenuOpen] = useState(false);
   const [isPerPageMenuOpen, setIsPerPageMenuOpen] = useState(false);
   const [selectedDisplayField, setSelectedDisplayField] = useState('message');
+  const [expandedEvents, setExpandedEvents] = useState<Set<number>>(new Set());
 
   const { pageEvents, totalPages } = useMemo(() => {
     const safeEvents = events ?? [];
@@ -90,6 +91,17 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
     }
   };
 
+  const renderTimestamp = (timestamp: string): JSX.Element => {
+    const [datePart, timePart] = timestamp.split(' ');
+    if (!timePart) return <>{timestamp}</>;
+    return (
+      <div style={{ lineHeight: 1.2 }}>
+        <div>{datePart}</div>
+        <div>{timePart}</div>
+      </div>
+    );
+  };
+
   const renderEventContent = (event: any): { kind: 'field'; text: string } | { kind: 'json'; json: string } => {
     // Show selected field value; if field is missing, fallback to full JSON.
     const hasSelectedField = event && Object.prototype.hasOwnProperty.call(event, selectedDisplayField);
@@ -111,6 +123,18 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
     const lines = text.split('\n');
     if (lines.length <= previewLines) return text;
     return lines.slice(0, previewLines).join('\n') + '\n...';
+  };
+
+  const toggleExpandedEvent = (eventIndex: number) => {
+    setExpandedEvents((prev) => {
+      const next = new Set(prev);
+      if (next.has(eventIndex)) {
+        next.delete(eventIndex);
+      } else {
+        next.add(eventIndex);
+      }
+      return next;
+    });
   };
 
   const renderAsLines = (text: string): JSX.Element => {
@@ -304,7 +328,7 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '24px 220px 1fr',
+            gridTemplateColumns: '24px 150px 1fr',
             gap: '0',
             borderBottom: '1px solid #d3dae6',
             backgroundColor: '#f5f7fa',
@@ -322,15 +346,19 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
           const globalIndex = pageIndex * eventsPerPage + idx;
           const timestamp = getTimestamp(event) || '-';
           const content = renderEventContent(event);
+          const fullText = content.kind === 'field' ? content.text : content.json;
+          const totalLines = fullText.split('\n').length;
+          const isExpanded = expandedEvents.has(globalIndex);
+          const isTruncationPossible = previewLines !== 'Full' && totalLines > (previewLines as number);
           const renderedText =
-            content.kind === 'field' ? getPreviewText(content.text) : getPreviewText(content.json);
+            isExpanded || previewLines === 'Full' ? fullText : getPreviewText(fullText);
 
           return (
             <div
               key={globalIndex}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '24px 220px 1fr',
+                gridTemplateColumns: '24px 150px 1fr',
                 gap: '0',
                 borderBottom: '1px solid #eef1f7',
               }}
@@ -351,13 +379,12 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
                   fontSize: '12px',
                   color: '#69707d',
                   borderRight: '1px solid #eef1f7',
-                  whiteSpace: 'nowrap',
+                  whiteSpace: 'normal',
                   overflow: 'hidden',
-                  textOverflow: 'ellipsis',
                 }}
                 title={timestamp}
               >
-                {timestamp}
+                {renderTimestamp(timestamp)}
               </div>
               <div
                 style={{
@@ -372,6 +399,17 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
                 }}
               >
                 {renderAsLines(renderedText)}
+                {isTruncationPossible && (
+                  <div style={{ marginTop: '4px' }}>
+                    <EuiButtonEmpty
+                      size="xs"
+                      flush="left"
+                      onClick={() => toggleExpandedEvent(globalIndex)}
+                    >
+                      {isExpanded ? 'Show less' : `Show all ${totalLines} lines`}
+                    </EuiButtonEmpty>
+                  </div>
+                )}
               </div>
             </div>
           );
