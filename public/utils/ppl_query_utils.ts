@@ -75,9 +75,7 @@ export const preprocessQuery = ({
 }): string => {
   let finalQuery = '';
   if (isEmpty(rawQuery) || !timeField) return rawQuery;
-  const normalizedRawQuery = normalizeFieldsSegments(
-    rawQuery.replace(PPL_TABLE_COMMAND_REGEX, '$1fields$2')
-  );
+  const normalizedRawQuery = normalizeFieldsSegments(rawQuery.replace(PPL_TABLE_COMMAND_REGEX, '$1fields$2'));
 
   // Convert time strings to PPL format
   const start = convertDateTime(startTime, true);
