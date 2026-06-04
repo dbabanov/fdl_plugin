@@ -17,6 +17,9 @@ import {
   EuiFlexItem,
   EuiPopover,
   EuiBadge,
+  EuiButton,
+  EuiHorizontalRule,
+  EuiToolTip,
 } from '@elastic/eui';
 import { I18nProvider } from '@osd/i18n/react';
 import isEmpty from 'lodash/isEmpty';
@@ -40,22 +43,21 @@ interface FieldWithStats extends IField {
 
 interface FieldsSidebarProps {
   availableFields: IField[];
-  selectedFields: IField[];
-  onAddField: (field: IField) => void;
-  onRemoveField: (field: IField) => void;
   /**
    * Append a WHERE filter for the given field and value to the query
    */
   onAddFilter: (fieldName: string, value: string) => void;
+  /**
+   * Append top-values command for a field to the query
+   */
+  onAddTopValuesCommand: (fieldName: string) => void;
   explorerData: any;
 }
 
 export const FieldsSidebar: React.FC<FieldsSidebarProps> = ({
   availableFields,
-  selectedFields,
-  onAddField,
-  onRemoveField,
   onAddFilter,
+  onAddTopValuesCommand,
   explorerData,
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -78,9 +80,10 @@ export const FieldsSidebar: React.FC<FieldsSidebarProps> = ({
       // Count occurrences of each value for this field
       explorerData.jsonData.forEach((row: any) => {
         const value = row[field.name];
-        if (value !== null && value !== undefined && value !== '') {
+        const valueStr = value === null || value === undefined ? '' : String(value).trim();
+        const isNullLikeString = valueStr.toLowerCase() === 'null';
+        if (value !== null && value !== undefined && valueStr !== '' && !isNullLikeString) {
           nonNullCount++;
-          const valueStr = String(value);
           valueCounts[valueStr] = (valueCounts[valueStr] || 0) + 1;
         }
       });
@@ -133,15 +136,6 @@ export const FieldsSidebar: React.FC<FieldsSidebarProps> = ({
     field.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Filter selected fields to only show those with non-null values
-  const selectedFieldsWithStats = selectedFields
-    .map((field) => fieldsWithStats.find((f) => f.name === field.name))
-    .filter((field): field is FieldWithStats => field !== undefined);
-  
-  const filteredSelectedFields = selectedFieldsWithStats.filter((field) =>
-    field.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   return (
     <I18nProvider>
       <EuiPanel paddingSize="s" style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden' }}>
@@ -160,40 +154,6 @@ export const FieldsSidebar: React.FC<FieldsSidebarProps> = ({
 
         {!isEmpty(explorerData) && (
           <>
-            {/* Selected Fields Section - Like Splunk's Selected Fields */}
-            {filteredSelectedFields.length > 0 && (
-              <>
-                <EuiTitle size="xxs">
-                  <h4>Selected Fields</h4>
-                </EuiTitle>
-                <EuiSpacer size="xs" />
-                <EuiListGroup gutterSize="none">
-                  {filteredSelectedFields.map((field) => (
-                    <EuiListGroupItem
-                      key={field.name}
-                      label={
-                        <EuiFlexGroup justifyContent="spaceBetween" alignItems="center" gutterSize="s">
-                          <EuiFlexItem grow={true}>
-                            <EuiText size="s">{field.name}</EuiText>
-                          </EuiFlexItem>
-                          <EuiFlexItem grow={false}>
-                            <EuiButtonIcon
-                              iconType="cross"
-                              aria-label={`Remove ${field.name}`}
-                              onClick={() => onRemoveField(field)}
-                              size="s"
-                            />
-                          </EuiFlexItem>
-                        </EuiFlexGroup>
-                      }
-                      size="s"
-                    />
-                  ))}
-                </EuiListGroup>
-                <EuiSpacer size="m" />
-              </>
-            )}
-
             {/* Interesting Fields Section - Like Splunk's Interesting Fields */}
             <EuiTitle size="xxs">
               <h4>Поля событий</h4>
@@ -201,7 +161,6 @@ export const FieldsSidebar: React.FC<FieldsSidebarProps> = ({
             <EuiSpacer size="xs" />
             <EuiListGroup gutterSize="none">
               {filteredAvailableFields.map((field) => {
-                const isSelected = selectedFields.some((sf) => sf.name === field.name);
                 const isPopoverOpen = popoverField?.name === field.name;
                 
                 return (
@@ -211,44 +170,22 @@ export const FieldsSidebar: React.FC<FieldsSidebarProps> = ({
                       <EuiListGroupItem
                         label={
                           <EuiFlexGroup justifyContent="spaceBetween" alignItems="center" gutterSize="s">
-                        <EuiFlexItem grow={true}>
-                          <EuiText size="s">
-                            {field.name}
-                            {field.uniqueValueCount !== undefined && (
-                              <EuiText size="xs" color="subdued" style={{ marginLeft: '8px' }}>
-                                ({field.uniqueValueCount > 100 ? '100+' : field.uniqueValueCount})
-                              </EuiText>
-                            )}
-                            {field.coverage && (
-                              <EuiText size="xs" color="subdued" style={{ marginLeft: '4px' }}>
-                                {Math.round(field.coverage * 100)}%
-                              </EuiText>
-                            )}
-                          </EuiText>
-                        </EuiFlexItem>
-                            <EuiFlexItem grow={false}>
-                              {isSelected ? (
-                                <EuiButtonIcon
-                                  iconType="check"
-                                  aria-label={`${field.name} is selected`}
-                                  size="s"
-                                  color="success"
-                                  onClick={(e: React.MouseEvent) => {
-                                    e.stopPropagation();
-                                    onRemoveField(field);
+                            <EuiFlexItem grow={true}>
+                              <EuiText size="s" style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                                <span
+                                  style={{
+                                    color: '#006BB4',
                                   }}
-                                />
-                              ) : (
-                                <EuiButtonIcon
-                                  iconType="plus"
-                                  aria-label={`Add ${field.name}`}
-                                  onClick={(e: React.MouseEvent) => {
-                                    e.stopPropagation();
-                                    onAddField(field);
-                                  }}
-                                  size="s"
-                                />
-                              )}
+                                >
+                                  {field.name}
+                                </span>{' '}
+                                <span style={{ color: '#98A2B3' }}>
+                                  {field.uniqueValueCount !== undefined
+                                    ? `${field.uniqueValueCount > 100 ? '100+' : field.uniqueValueCount}`
+                                    : '0'}
+                                </span>{' '}
+                                ({Math.round((field.coverage || 0) * 100)} %)
+                              </EuiText>
                             </EuiFlexItem>
                           </EuiFlexGroup>
                         }
@@ -256,7 +193,7 @@ export const FieldsSidebar: React.FC<FieldsSidebarProps> = ({
                         onClick={() => {
                           setPopoverField(isPopoverOpen ? null : field);
                         }}
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: 'pointer', whiteSpace: 'normal' }}
                       />
                     }
                     isOpen={isPopoverOpen}
@@ -265,41 +202,71 @@ export const FieldsSidebar: React.FC<FieldsSidebarProps> = ({
                     panelPaddingSize="s"
                     style={{ width: '100%' }}
                   >
-                    <div style={{ minWidth: '300px', maxWidth: '400px', maxHeight: '400px', overflowY: 'auto' }}>
+                    <div style={{ minWidth: '340px', maxWidth: '420px', maxHeight: '420px', overflowY: 'auto' }}>
                       <EuiText size="s" style={{ fontWeight: 'bold', marginBottom: '8px' }}>
                         {field.name}
-                        {field.uniqueValueCount !== undefined && (
-                          <EuiText size="xs" color="subdued" style={{ marginLeft: '8px', fontWeight: 'normal' }}>
-                            ({field.uniqueValueCount > 100 ? '100+' : field.uniqueValueCount} values)
-                          </EuiText>
-                        )}
                       </EuiText>
-                      <EuiText size="xs" color="subdued" style={{ marginBottom: '12px' }}>
-                        Top 10 values (click to add to query)
+                      <EuiText size="xs" color="subdued" style={{ marginBottom: '8px' }}>
+                        {field.uniqueValueCount !== undefined
+                          ? `${field.uniqueValueCount > 100 ? '100+' : field.uniqueValueCount} values`
+                          : '0 values'}
+                        {` | Event coverage: ${Math.round((field.coverage || 0) * 100)}%`}
+                      </EuiText>
+                      <EuiButton
+                        size="s"
+                        iconType="visBarVertical"
+                        onClick={() => onAddTopValuesCommand(field.name)}
+                      >
+                        Top values
+                      </EuiButton>
+                      <EuiHorizontalRule margin="s" />
+                      <EuiText size="xs" color="subdued" style={{ marginBottom: '8px' }}>
+                        Top 10 values
                       </EuiText>
                       {field.topValues.length > 0 ? (
-                        <EuiListGroup gutterSize="none">
-                          {field.topValues.map((item, index) => (
-                            <EuiListGroupItem
-                              key={`${field.name}-${index}`}
-                              label={
-                                <EuiFlexGroup justifyContent="spaceBetween" alignItems="center" gutterSize="s">
-                                  <EuiFlexItem grow={true}>
-                                    <EuiText size="xs" style={{ wordBreak: 'break-word' }}>
-                                      {item.value.length > 100 ? `${item.value.substring(0, 100)}...` : item.value}
-                                    </EuiText>
-                                  </EuiFlexItem>
-                                  <EuiFlexItem grow={false}>
-                                    <EuiBadge color="hollow">{item.count}</EuiBadge>
-                                  </EuiFlexItem>
-                                </EuiFlexGroup>
-                              }
-                              size="xs"
-                              onClick={() => onAddFilter(field.name, item.value)}
-                              style={{ cursor: 'pointer' }}
-                            />
-                          ))}
-                        </EuiListGroup>
+                        <div>
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 70px 60px',
+                              columnGap: '8px',
+                              padding: '0 4px 6px 4px',
+                              borderBottom: '1px solid #D3DAE6',
+                              marginBottom: '4px',
+                            }}
+                          >
+                            <EuiText size="xs" color="subdued">Values</EuiText>
+                            <EuiText size="xs" color="subdued">Count</EuiText>
+                            <EuiText size="xs" color="subdued">%</EuiText>
+                          </div>
+                          {field.topValues.map((item, index) => {
+                            const percent = field.nonNullCount > 0 ? (item.count / field.nonNullCount) * 100 : 0;
+                            return (
+                              <div
+                                key={`${field.name}-${index}`}
+                                onClick={() => onAddFilter(field.name, item.value)}
+                                style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: '1fr 70px 60px',
+                                  columnGap: '8px',
+                                  padding: '6px 4px',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid #EEF1F7',
+                                }}
+                              >
+                                <EuiToolTip content={item.value}>
+                                  <EuiText size="xs" style={{ wordBreak: 'break-word' }}>
+                                    {item.value.length > 100 ? `${item.value.substring(0, 100)}...` : item.value}
+                                  </EuiText>
+                                </EuiToolTip>
+                                <EuiText size="xs">
+                                  <EuiBadge color="hollow">{item.count}</EuiBadge>
+                                </EuiText>
+                                <EuiText size="xs">{percent.toFixed(2)}%</EuiText>
+                              </div>
+                            );
+                          })}
+                        </div>
                       ) : (
                         <EuiText size="xs" color="subdued">No values</EuiText>
                       )}

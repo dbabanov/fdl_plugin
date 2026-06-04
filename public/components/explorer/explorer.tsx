@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   EuiPage,
   EuiPageBody,
@@ -22,8 +22,8 @@ import { SearchBar } from './search_bar';
 import { FieldsSidebar } from './fields_sidebar';
 import { DataGrid } from './data_grid';
 import { RawEventsView } from './raw_events_view';
+import { EventsMessagesView } from './events_messages_view';
 import { Timeline } from './timeline';
-import { StatisticsPanel } from './statistics_panel';
 import { preprocessQuery } from '../../utils/ppl_query_utils';
 
 interface IField {
@@ -43,15 +43,17 @@ interface ExplorerProps {
   notifications: CoreStart['notifications'];
 }
 
+const LAST_RUN_STORAGE_KEY = 'fdl_plugin:last_run_query_state';
+
 export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
   const [tempQuery, setTempQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [explorerData, setExplorerData] = useState<ExplorerData | null>(null);
   const [availableFields, setAvailableFields] = useState<IField[]>([]);
-  const [selectedFields, setSelectedFields] = useState<IField[]>([]);
-  const [selectedTabId, setSelectedTabId] = useState<string>('events');
+  const [selectedTabId, setSelectedTabId] = useState<string>('events_messages');
   const [startTime, setStartTime] = useState<string>('now-15m');
   const [endTime, setEndTime] = useState<string>('now');
+  // Used for rendering/time display in the UI (timeline, grids). Time filtering always uses @timestamp.
   const [timestampField, setTimestampField] = useState<string>('');
 
   const pplService = new PPLService(http);
@@ -78,34 +80,29 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
     };
   };
 
-  /**
-   * Detects the timestamp field name from available fields or uses common defaults
-   */
-  const detectTimestampField = (fields: IField[]): string => {
-    // First, check if we already have a timestamp field set from previous queries
-    if (timestampField) return timestampField;
-    
-    // Try to find timestamp field in current schema
-    const tsField = fields.find(
-      (f) =>
-        f.type === 'timestamp' ||
-        f.name.toLowerCase().includes('timestamp') ||
-        f.name === '@timestamp' ||
-        f.name === 'timestamp'
-    );
-    
-    if (tsField) return tsField.name;
-    
-    // Common timestamp field names to try
-    const commonFields = ['@timestamp', 'timestamp', 'time', 'event_time', 'log_time', '_time'];
-    for (const fieldName of commonFields) {
-      if (fields.some((f) => f.name === fieldName)) {
-        return fieldName;
+  const TIME_FILTER_FIELD = '@timestamp';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const raw = window.localStorage.getItem(LAST_RUN_STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { query?: string; startTime?: string; endTime?: string };
+
+      if (typeof saved.query === 'string') {
+        setTempQuery(saved.query);
       }
+      if (typeof saved.startTime === 'string') {
+        setStartTime(saved.startTime);
+      }
+      if (typeof saved.endTime === 'string') {
+        setEndTime(saved.endTime);
+      }
+    } catch {
+      // Ignore malformed localStorage payloads and continue with defaults.
     }
-    
-    return '';
-  };
+  }, []);
 
   const handleQuerySearch = useCallback(async () => {
     if (!tempQuery.trim()) {
@@ -119,37 +116,29 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
     setIsLoading(true);
 
     try {
-      // Detect timestamp field from previous query results
-      const detectedTimestampField = detectTimestampField(availableFields);
-      
-      // Build the query with time range filter
-      // Always apply time filter - use detected field or try common field names
-      let queryWithTimeFilter = tempQuery.trim();
-      
-      if (detectedTimestampField) {
-        // We have a confirmed timestamp field, use it
-        queryWithTimeFilter = preprocessQuery({
-          rawQuery: tempQuery.trim(),
-          startTime,
-          endTime,
-          timeField: detectedTimestampField,
-        });
-      } else {
-        // Try common timestamp field names for first query
-        // Most OpenSearch indices use @timestamp
-        const commonTimestampFields = ['@timestamp', 'timestamp', 'time', 'event_time'];
-        queryWithTimeFilter = preprocessQuery({
-          rawQuery: tempQuery.trim(),
-          startTime,
-          endTime,
-          timeField: commonTimestampFields[0], // Start with @timestamp (most common)
-        });
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(
+          LAST_RUN_STORAGE_KEY,
+          JSON.stringify({
+            query: tempQuery.trim(),
+            startTime,
+            endTime,
+          })
+        );
       }
 
+      // Build the query with time range filter.
+      // Requirement: always use @timestamp for the time filter injection.
+      const queryWithTimeFilter = preprocessQuery({
+        rawQuery: tempQuery.trim(),
+        startTime,
+        endTime,
+        timeField: TIME_FILTER_FIELD,
+      });
+
       // Log the query being executed
-      const timeFieldUsed = detectedTimestampField || '@timestamp';
       console.log('[FDL Plugin] Executing PPL Query:', queryWithTimeFilter);
-      console.log('[FDL Plugin] Time filter applied using field:', timeFieldUsed);
+      console.log('[FDL Plugin] Time filter applied using field:', TIME_FILTER_FIELD);
       console.log('[FDL Plugin] Time range:', { startTime, endTime });
 
       const response = await pplService.fetch({
@@ -181,17 +170,7 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [tempQuery, startTime, endTime, availableFields, timestampField, pplService, notifications]);
-
-  const handleAddField = (field: IField) => {
-    if (!selectedFields.find((f) => f.name === field.name)) {
-      setSelectedFields([...selectedFields, field]);
-    }
-  };
-
-  const handleRemoveField = (field: IField) => {
-    setSelectedFields(selectedFields.filter((f) => f.name !== field.name));
-  };
+  }, [tempQuery, startTime, endTime, availableFields, pplService, notifications]);
 
   const escapePPLString = (value: string): string =>
     `'${value.replace(/'/g, "''")}'`;
@@ -211,10 +190,46 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
     });
   };
 
+  const handleAddTopValuesCommand = (fieldName: string) => {
+    setTempQuery((prev) => {
+      const trimmed = prev.trim();
+      const command = `top 20 \`${fieldName}\``;
+      if (!trimmed) return command;
+      return `${trimmed} | ${command}`;
+    });
+  };
+
   const tabs: EuiTabbedContentTab[] = [
     {
-      id: 'events',
+      id: 'events_messages',
       name: 'События',
+      content: (
+        <div>
+          {isLoading ? (
+            <EuiPanel>
+              <EuiLoadingSpinner size="l" />
+              <EuiSpacer size="m" />
+              <EuiText textAlign="center">Running query...</EuiText>
+            </EuiPanel>
+          ) : explorerData && explorerData.jsonData.length > 0 ? (
+            <EventsMessagesView
+              events={explorerData.jsonData}
+              totalHits={explorerData.total || explorerData.datarows.length}
+            />
+          ) : (
+            <EuiPanel>
+              <EuiText textAlign="center">
+                <h2>No results</h2>
+                <p>Enter a PPL query and click Run to see results</p>
+              </EuiText>
+            </EuiPanel>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'events',
+      name: 'Json',
       content: (
         <div>
           {isLoading ? (
@@ -304,20 +319,13 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
           />
         </div>
 
-        {/* Part 2: Statistics and Timeline */}
-        <div style={{ padding: '0 16px' }}>
-          <StatisticsPanel
-            totalHits={explorerData?.total || explorerData?.datarows?.length || 0}
-            startTime={startTime}
-            endTime={endTime}
-            isLoading={isLoading}
-          />
-          <EuiSpacer size="s" />
+        {/* Part 2: Timeline */}
+        <EuiPanel paddingSize="none" style={{ margin: '0 16px' }}>
           <Timeline
             data={explorerData?.jsonData}
             timeField={timestampField}
           />
-        </div>
+        </EuiPanel>
         <EuiSpacer size="m" />
 
         {/* Part 3 & 4: Fields Sidebar and Events/Table side by side */}
@@ -327,10 +335,8 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
             <div>
               <FieldsSidebar
                 availableFields={availableFields}
-                selectedFields={selectedFields}
-                onAddField={handleAddField}
-                onRemoveField={handleRemoveField}
                 onAddFilter={handleAddFilter}
+                onAddTopValuesCommand={handleAddTopValuesCommand}
                 explorerData={explorerData}
               />
             </div>

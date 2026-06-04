@@ -14,6 +14,23 @@ export const PPL_DATE_FORMAT = 'YYYY-MM-DD HH:mm:ss.SSS';
 // Matches: "source = index" or "search source = index" or "index = index"
 export const PPL_INDEX_INSERT_POINT_REGEX = /(search source|source|index)\s*=\s*([^|\s]+)(.*)/i;
 export const PPL_NEWLINE_REGEX = /[\n\r]+/g;
+export const PPL_TABLE_COMMAND_REGEX = /(\|\s*)table(\s+)/gi;
+export const PPL_FIELDS_SEGMENT_REGEX = /(\|\s*fields\s+)([^|]+)/gi;
+
+const normalizeFieldsSegments = (query: string): string => {
+  return query.replace(PPL_FIELDS_SEGMENT_REGEX, (_match, prefix: string, rawFields: string) => {
+    const trimmed = rawFields.trim();
+    if (!trimmed) return `${prefix}${rawFields}`;
+
+    // If user already provided comma-separated fields, keep as is.
+    if (trimmed.includes(',')) return `${prefix}${trimmed} `;
+
+    // Split by whitespace while preserving backtick-wrapped field names.
+    const parts = trimmed.match(/`[^`]+`|[^\s]+/g) || [];
+    if (parts.length <= 1) return `${prefix}${trimmed} `;
+    return `${prefix}${parts.join(', ')} `;
+  });
+};
 
 /**
  * Converts a datetime string to PPL format
@@ -58,6 +75,7 @@ export const preprocessQuery = ({
 }): string => {
   let finalQuery = '';
   if (isEmpty(rawQuery) || !timeField) return rawQuery;
+  const normalizedRawQuery = normalizeFieldsSegments(rawQuery.replace(PPL_TABLE_COMMAND_REGEX, '$1fields$2'));
 
   // Convert time strings to PPL format
   const start = convertDateTime(startTime, true);
@@ -65,22 +83,24 @@ export const preprocessQuery = ({
 
   if (!start || !end) {
     // If time parsing fails, return original query
-    return rawQuery;
+    return normalizedRawQuery;
   }
 
   // Remove newlines and find the insertion point
-  const tokens = rawQuery.replaceAll(PPL_NEWLINE_REGEX, '').match(PPL_INDEX_INSERT_POINT_REGEX);
+  const tokens = normalizedRawQuery
+    .replaceAll(PPL_NEWLINE_REGEX, '')
+    .match(PPL_INDEX_INSERT_POINT_REGEX);
 
   if (isEmpty(tokens) || !tokens) {
     // If we can't find the insertion point, try to append the WHERE clause
     // Check if query already has a WHERE clause
-    const hasWhere = /\s+where\s+/i.test(rawQuery);
+    const hasWhere = /\s+where\s+/i.test(normalizedRawQuery);
     if (hasWhere) {
       // Append to existing WHERE clause
-      finalQuery = `${rawQuery.trim()} AND \`${timeField}\` >= '${start}' AND \`${timeField}\` <= '${end}'`;
+      finalQuery = `${normalizedRawQuery.trim()} AND \`${timeField}\` >= '${start}' AND \`${timeField}\` <= '${end}'`;
     } else {
       // Add new WHERE clause
-      finalQuery = `${rawQuery.trim()} | where \`${timeField}\` >= '${start}' AND \`${timeField}\` <= '${end}'`;
+      finalQuery = `${normalizedRawQuery.trim()} | where \`${timeField}\` >= '${start}' AND \`${timeField}\` <= '${end}'`;
     }
   } else {
     // Insert a standalone time filter immediately after the source/index command.
