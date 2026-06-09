@@ -19,9 +19,14 @@ import {
 import moment from 'moment';
 import { useFdlTheme } from '../../hooks/use_fdl_theme';
 
+interface FieldOption {
+  name: string;
+}
+
 interface EventsMessagesViewProps {
   events: any[];
   totalHits: number;
+  availableFields?: FieldOption[];
 }
 
 const TIME_DISPLAY_FORMAT = 'YYYY-MM-DD HH:mm:ss.SSS';
@@ -56,6 +61,7 @@ const loadSelectedFields = (): string[] => {
 export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
   events,
   totalHits,
+  availableFields = [],
 }) => {
   const [pageIndex, setPageIndex] = useState(0);
   const [eventsPerPage, setEventsPerPage] = useState(DEFAULT_EVENTS_PER_PAGE);
@@ -94,26 +100,28 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
     };
   }, [events, pageIndex, eventsPerPage]);
 
-  const displayFields = useMemo(() => {
+  const allKnownFields = useMemo(() => {
     const fields = new Set<string>();
+
+    availableFields.forEach((field) => fields.add(field.name));
     (events || []).forEach((event) => {
       Object.keys(event || {}).forEach((key) => fields.add(key));
     });
+    selectedDisplayFields.forEach((fieldName) => fields.add(fieldName));
 
-    const allFields = Array.from(fields).sort((a, b) => a.localeCompare(b));
-    if (!allFields.includes('message')) {
-      return ['message', ...allFields];
+    const sorted = Array.from(fields).sort((a, b) => a.localeCompare(b));
+    if (!sorted.includes('message')) {
+      return ['message', ...sorted];
     }
-    return ['message', ...allFields.filter((f) => f !== 'message')];
-  }, [events]);
+    return ['message', ...sorted.filter((f) => f !== 'message')];
+  }, [availableFields, events, selectedDisplayFields]);
 
   const pickerFields = useMemo(() => {
-    const selected = selectedDisplayFields.filter((f) => displayFields.includes(f));
-    const unselected = displayFields
+    const unselected = allKnownFields
       .filter((f) => !selectedDisplayFields.includes(f))
       .sort((a, b) => a.localeCompare(b));
-    return [...selected, ...unselected];
-  }, [displayFields, selectedDisplayFields]);
+    return [...selectedDisplayFields, ...unselected];
+  }, [allKnownFields, selectedDisplayFields]);
 
   const handleEventsPerPageChange = (value: string) => {
     const newPerPage = parseInt(value, 10);
@@ -187,10 +195,7 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
     if (selectedDisplayFields.length === 0) {
       return 'Event: —';
     }
-    if (selectedDisplayFields.length <= 2) {
-      return `Event: ${selectedDisplayFields.join(', ')}`;
-    }
-    return `Event: ${selectedDisplayFields[0]} (+${selectedDisplayFields.length - 1})`;
+    return `Event: ${selectedDisplayFields.join(', ')}`;
   };
 
   const gridTemplateColumns = `24px 150px ${selectedDisplayFields

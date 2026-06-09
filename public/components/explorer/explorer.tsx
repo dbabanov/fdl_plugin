@@ -210,6 +210,7 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
             <EventsMessagesView
               events={explorerData.jsonData}
               totalHits={explorerData.total || explorerData.datarows.length}
+              availableFields={availableFields}
             />
           ) : (
             <EuiPanel>
