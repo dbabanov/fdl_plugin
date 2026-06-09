@@ -64,13 +64,7 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
       const record: any = {};
       for (let i = 0; i < queryResult.schema.length; i++) {
         const cur = queryResult.schema[i];
-        if (typeof row[i] === 'object') {
-          record[cur.name] = JSON.stringify(row[i]);
-        } else if (typeof row[i] === 'boolean') {
-          record[cur.name] = row[i].toString();
-        } else {
-          record[cur.name] = row[i];
-        }
+        record[cur.name] = row[i];
       }
       data.push(record);
     });
