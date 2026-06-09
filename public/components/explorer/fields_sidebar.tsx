@@ -23,6 +23,7 @@ import {
 } from '@elastic/eui';
 import { I18nProvider } from '@osd/i18n/react';
 import isEmpty from 'lodash/isEmpty';
+import { useFdlTheme } from '../../hooks/use_fdl_theme';
 
 interface IField {
   name: string;
@@ -62,6 +63,7 @@ export const FieldsSidebar: React.FC<FieldsSidebarProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [popoverField, setPopoverField] = useState<FieldWithStats | null>(null);
+  const theme = useFdlTheme();
 
   // Calculate field statistics: filter fields with non-null values and get top 10 values by count
   // Sort by "interestingness" - fields with more unique values and higher coverage are more interesting
@@ -174,12 +176,12 @@ export const FieldsSidebar: React.FC<FieldsSidebarProps> = ({
                               <EuiText size="s" style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
                                 <span
                                   style={{
-                                    color: '#006BB4',
+                                    color: theme.link,
                                   }}
                                 >
                                   {field.name}
                                 </span>{' '}
-                                <span style={{ color: '#98A2B3' }}>
+                                <span style={{ color: theme.textMuted }}>
                                   {field.uniqueValueCount !== undefined
                                     ? `${field.uniqueValueCount > 100 ? '100+' : field.uniqueValueCount}`
                                     : '0'}
@@ -231,7 +233,7 @@ export const FieldsSidebar: React.FC<FieldsSidebarProps> = ({
                               gridTemplateColumns: '1fr 70px 60px',
                               columnGap: '8px',
                               padding: '0 4px 6px 4px',
-                              borderBottom: '1px solid #D3DAE6',
+                              borderBottom: `1px solid ${theme.border}`,
                               marginBottom: '4px',
                             }}
                           >
@@ -251,7 +253,7 @@ export const FieldsSidebar: React.FC<FieldsSidebarProps> = ({
                                   columnGap: '8px',
                                   padding: '6px 4px',
                                   cursor: 'pointer',
-                                  borderBottom: '1px solid #EEF1F7',
+                                  borderBottom: `1px solid ${theme.borderLight}`,
                                 }}
                               >
                                 <EuiToolTip content={item.value}>

@@ -21,6 +21,7 @@ import {
   EuiLink,
 } from '@elastic/eui';
 import moment from 'moment';
+import { useFdlTheme } from '../../hooks/use_fdl_theme';
 
 interface RawEventsViewProps {
   events: any[];
@@ -45,6 +46,7 @@ export const RawEventsView: React.FC<RawEventsViewProps> = ({
   const [expandedEvents, setExpandedEvents] = useState<Set<number>>(new Set());
   const [isPreviewMenuOpen, setIsPreviewMenuOpen] = useState(false);
   const [isPerPageMenuOpen, setIsPerPageMenuOpen] = useState(false);
+  const theme = useFdlTheme();
 
   const totalPages = Math.ceil(events.length / eventsPerPage);
   const startIndex = pageIndex * eventsPerPage;
@@ -167,10 +169,10 @@ export const RawEventsView: React.FC<RawEventsViewProps> = ({
     <EuiPanel paddingSize="s">
       <div
         style={{
-          border: '1px solid #d3dae6',
+          border: `1px solid ${theme.border}`,
           borderRadius: '4px',
           overflow: 'hidden',
-          backgroundColor: '#ffffff',
+          backgroundColor: theme.panelBackground,
         }}
       >
         <div
@@ -179,10 +181,10 @@ export const RawEventsView: React.FC<RawEventsViewProps> = ({
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '6px 10px',
-            borderBottom: '1px solid #d3dae6',
-            backgroundColor: '#f5f7fa',
+            borderBottom: `1px solid ${theme.border}`,
+            backgroundColor: theme.toolbarBackground,
             fontSize: '12px',
-            color: '#69707d',
+            color: theme.textSubdued,
           }}
         >
           <div style={{ display: 'flex', gap: '14px' }}>
@@ -288,7 +290,7 @@ export const RawEventsView: React.FC<RawEventsViewProps> = ({
 
             return (
               <div key={globalIndex} style={{ marginBottom: '8px' }}>
-                <EuiPanel paddingSize="s" style={{ backgroundColor: '#f5f7fa' }}>
+                <EuiPanel paddingSize="s" style={{ backgroundColor: theme.toolbarBackground }}>
                   <EuiFlexGroup direction="column" gutterSize="xs">
                     <EuiFlexGroup gutterSize="s" alignItems="center" justifyContent="spaceBetween">
                       <EuiFlexItem grow={false}>

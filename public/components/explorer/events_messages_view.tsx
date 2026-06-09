@@ -17,6 +17,7 @@ import {
   EuiCheckbox,
 } from '@elastic/eui';
 import moment from 'moment';
+import { useFdlTheme } from '../../hooks/use_fdl_theme';
 
 interface EventsMessagesViewProps {
   events: any[];
@@ -64,6 +65,7 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
   const [isPerPageMenuOpen, setIsPerPageMenuOpen] = useState(false);
   const [selectedDisplayFields, setSelectedDisplayFields] = useState<string[]>(loadSelectedFields);
   const [expandedCells, setExpandedCells] = useState<Set<string>>(new Set());
+  const theme = useFdlTheme();
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -256,10 +258,10 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
     <EuiPanel paddingSize="s">
       <div
         style={{
-          border: '1px solid #d3dae6',
+          border: `1px solid ${theme.border}`,
           borderRadius: '4px',
           overflow: 'hidden',
-          backgroundColor: '#ffffff',
+          backgroundColor: theme.panelBackground,
         }}
       >
         <div
@@ -268,10 +270,10 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '6px 10px',
-            borderBottom: '1px solid #d3dae6',
-            backgroundColor: '#f5f7fa',
+            borderBottom: `1px solid ${theme.border}`,
+            backgroundColor: theme.toolbarBackground,
             fontSize: '12px',
-            color: '#69707d',
+            color: theme.textSubdued,
           }}
         >
           <div style={{ display: 'flex', gap: '14px' }}>
@@ -405,19 +407,19 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
             display: 'grid',
             gridTemplateColumns,
             gap: '0',
-            borderBottom: '1px solid #d3dae6',
-            backgroundColor: '#f5f7fa',
+            borderBottom: `1px solid ${theme.border}`,
+            backgroundColor: theme.toolbarBackground,
             fontSize: '12px',
-            color: '#69707d',
+            color: theme.textSubdued,
             fontWeight: 600,
           }}
         >
           <div style={{ padding: '6px 8px' }}>i</div>
-          <div style={{ padding: '6px 10px', borderLeft: '1px solid #e5e9f0' }}>Time</div>
+          <div style={{ padding: '6px 10px', borderLeft: `1px solid ${theme.borderMedium}` }}>Time</div>
           {selectedDisplayFields.map((fieldName) => (
             <div
               key={fieldName}
-              style={{ padding: '6px 10px', borderLeft: '1px solid #e5e9f0' }}
+              style={{ padding: '6px 10px', borderLeft: `1px solid ${theme.borderMedium}` }}
               title={fieldName}
             >
               {fieldName}
@@ -436,14 +438,14 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
                 display: 'grid',
                 gridTemplateColumns,
                 gap: '0',
-                borderBottom: '1px solid #eef1f7',
+                borderBottom: `1px solid ${theme.borderLight}`,
               }}
             >
               <div
                 style={{
                   padding: '8px 6px',
                   fontSize: '11px',
-                  color: '#98a2b3',
+                  color: theme.textMuted,
                   textAlign: 'center',
                 }}
               >
@@ -453,8 +455,8 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
                 style={{
                   padding: '8px 10px',
                   fontSize: '12px',
-                  color: '#69707d',
-                  borderRight: '1px solid #eef1f7',
+                  color: theme.textSubdued,
+                  borderRight: `1px solid ${theme.borderLight}`,
                   whiteSpace: 'normal',
                   overflow: 'hidden',
                 }}
@@ -481,9 +483,9 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
                         '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace',
                       fontSize: '12px',
                       lineHeight: 1.35,
-                      color: '#343741',
+                      color: theme.textPrimary,
                       overflowX: 'auto',
-                      borderLeft: '1px solid #eef1f7',
+                      borderLeft: `1px solid ${theme.borderLight}`,
                     }}
                   >
                     {fullText ? (
@@ -502,7 +504,7 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
                         )}
                       </>
                     ) : (
-                      <span style={{ color: '#98a2b3' }}>—</span>
+                      <span style={{ color: theme.textMuted }}>—</span>
                     )}
                   </div>
                 );

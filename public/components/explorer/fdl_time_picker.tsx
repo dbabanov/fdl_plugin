@@ -21,6 +21,7 @@ import {
 } from '@elastic/eui';
 import dateMath from '@elastic/datemath';
 import moment, { Moment } from 'moment';
+import { useFdlTheme } from '../../hooks/use_fdl_theme';
 
 export interface TimePreset {
   id: string;
@@ -172,6 +173,7 @@ export const FdlTimePicker: React.FC<FdlTimePickerProps> = ({
   const [fromTimeTouched, setFromTimeTouched] = useState(false);
   const [toTimeTouched, setToTimeTouched] = useState(false);
 
+  const theme = useFdlTheme();
   const triggerLabel = useMemo(() => formatRangeLabel(start, end), [start, end]);
 
   const fromTimeError = fromTimeTouched ? getTimeFieldError(fromTime) : undefined;
@@ -349,9 +351,10 @@ export const FdlTimePicker: React.FC<FdlTimePickerProps> = ({
       {activeTab === 'presets' && (
         <div
           style={{
-            border: '1px solid #d3dae6',
+            border: `1px solid ${theme.border}`,
             borderRadius: '4px',
             overflow: 'hidden',
+            backgroundColor: theme.panelBackground,
           }}
         >
           {FDL_TIME_PRESETS.map((preset) => {
@@ -369,8 +372,9 @@ export const FdlTimePicker: React.FC<FdlTimePickerProps> = ({
                   display: 'block',
                   width: '100%',
                   padding: '8px 12px',
-                  backgroundColor: isSelected ? '#d3e4ff' : 'transparent',
-                  borderBottom: '1px solid #eef1f7',
+                  backgroundColor: isSelected ? theme.presetSelected : 'transparent',
+                  borderBottom: `1px solid ${theme.borderLight}`,
+                  color: theme.textPrimary,
                 }}
               >
                 {preset.label}
