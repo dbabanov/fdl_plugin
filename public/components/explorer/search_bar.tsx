@@ -10,10 +10,9 @@ import {
   EuiButton,
   EuiTextArea,
   EuiFormRow,
-  EuiSuperDatePicker,
-  OnTimeChangeProps,
 } from '@elastic/eui';
 import { I18nProvider } from '@osd/i18n/react';
+import { FdlTimePicker } from './fdl_time_picker';
 
 interface SearchBarProps {
   tempQuery: string;
@@ -37,11 +36,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onEndTimeChange,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-
-  const handleTimeChange = ({ start, end }: OnTimeChangeProps) => {
-    onStartTimeChange(start);
-    onEndTimeChange(end);
-  };
 
   // Auto-resize textarea based on content
   useEffect(() => {
@@ -78,12 +72,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           </EuiFormRow>
         </EuiFlexItem>
         <EuiFlexItem grow={false}>
-          <EuiSuperDatePicker
+          <FdlTimePicker
             start={startTime}
             end={endTime}
-            onTimeChange={handleTimeChange}
-            showUpdateButton={false}
-            compressed={true}
+            onTimeChange={(start, end) => {
+              onStartTimeChange(start);
+              onEndTimeChange(end);
+            }}
           />
         </EuiFlexItem>
         <EuiFlexItem grow={false}>
@@ -93,7 +88,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             isLoading={isLoading}
             data-test-subj="explorerQueryButton"
           >
-            Поиск
+            Search
           </EuiButton>
         </EuiFlexItem>
       </EuiFlexGroup>

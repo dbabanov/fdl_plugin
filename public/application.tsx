@@ -1,16 +1,19 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { AppMountParameters, CoreStart } from '../../../src/core/public';
+import { OpenSearchDashboardsContextProvider } from '../../../src/plugins/opensearch_dashboards_react/public';
 import { AppPluginStartDependencies } from './types';
 import { Explorer } from './components/explorer/explorer';
 
 export const renderApp = (
-  { notifications, http }: CoreStart,
+  core: CoreStart,
   { navigation }: AppPluginStartDependencies,
-  { appBasePath, element }: AppMountParameters
+  { element }: AppMountParameters
 ) => {
   ReactDOM.render(
-    <Explorer http={http} notifications={notifications} />,
+    <OpenSearchDashboardsContextProvider services={core}>
+      <Explorer http={core.http} notifications={core.notifications} />
+    </OpenSearchDashboardsContextProvider>,
     element
   );
 
