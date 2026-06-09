@@ -156,15 +156,15 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
     if (value === null || value === undefined) {
       return '';
     }
+    if (typeof value === 'string') {
+      return value;
+    }
     if (typeof value === 'object') {
       try {
         return JSON.stringify(value, null, 2);
       } catch {
         return String(value);
       }
-    }
-    if (typeof value === 'boolean') {
-      return value.toString();
     }
     return String(value);
   };
@@ -218,16 +218,9 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
     });
   };
 
-  const renderAsLines = (text: string): JSX.Element => {
-    const lines = text.split('\n');
-    return (
-      <>
-        {lines.map((line, index) => (
-          <div key={index}>{line || '\u00A0'}</div>
-        ))}
-      </>
-    );
-  };
+  const renderFieldValue = (text: string): JSX.Element => (
+    <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{text}</div>
+  );
 
   const exportToCsv = () => {
     if (!events || events.length === 0) return;
@@ -495,7 +488,7 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
                   >
                     {fullText ? (
                       <>
-                        {renderAsLines(renderedText)}
+                        {renderFieldValue(renderedText)}
                         {isTruncationPossible && (
                           <div style={{ marginTop: '4px' }}>
                             <EuiButtonEmpty
@@ -503,7 +496,7 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
                               flush="left"
                               onClick={() => toggleExpandedCell(globalIndex, fieldName)}
                             >
-                              {isExpanded ? 'Show less' : `Show all ${totalLines} lines`}
+                              {isExpanded ? 'Show less' : `Показать все ${totalLines} строки`}
                             </EuiButtonEmpty>
                           </div>
                         )}
