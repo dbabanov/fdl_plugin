@@ -21,7 +21,7 @@ export class FdlPluginPlugin implements Plugin<FdlPluginPluginSetup, FdlPluginPl
     const router = core.http.createRouter();
 
     // Register server side APIs
-    defineRoutes(router);
+    defineRoutes(router, this.logger);
 
     return {};
   }
