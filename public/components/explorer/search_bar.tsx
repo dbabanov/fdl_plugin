@@ -93,7 +93,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             isLoading={isLoading}
             data-test-subj="explorerQueryButton"
           >
-            Поиск
+            Search
           </EuiButton>
         </EuiFlexItem>
       </EuiFlexGroup>
