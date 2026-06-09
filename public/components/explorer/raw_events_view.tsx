@@ -14,9 +14,11 @@ import {
   EuiFlexItem,
   EuiButtonIcon,
   EuiToolTip,
-  EuiSelect,
-  EuiFormRow,
-  EuiButton,
+  EuiButtonEmpty,
+  EuiPopover,
+  EuiContextMenuItem,
+  EuiContextMenuPanel,
+  EuiLink,
 } from '@elastic/eui';
 import moment from 'moment';
 
@@ -30,7 +32,7 @@ const DATE_DISPLAY_FORMAT = 'MMM D, YYYY @ HH:mm:ss.SSS';
 const DEFAULT_EVENTS_PER_PAGE = 10;
 const EVENTS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200];
 const DEFAULT_PREVIEW_LINES = 10;
-const PREVIEW_LINES_OPTIONS = [5, 10, 15, 20, 30, 50, 100, 'Full'];
+const PREVIEW_LINES_OPTIONS = [5, 10, 15, 20, 30, 50, 100, 'Full'] as const;
 
 export const RawEventsView: React.FC<RawEventsViewProps> = ({
   events,
@@ -41,6 +43,8 @@ export const RawEventsView: React.FC<RawEventsViewProps> = ({
   const [eventsPerPage, setEventsPerPage] = useState(DEFAULT_EVENTS_PER_PAGE);
   const [previewLines, setPreviewLines] = useState<number | 'Full'>(DEFAULT_PREVIEW_LINES);
   const [expandedEvents, setExpandedEvents] = useState<Set<number>>(new Set());
+  const [isPreviewMenuOpen, setIsPreviewMenuOpen] = useState(false);
+  const [isPerPageMenuOpen, setIsPerPageMenuOpen] = useState(false);
 
   const totalPages = Math.ceil(events.length / eventsPerPage);
   const startIndex = pageIndex * eventsPerPage;
@@ -61,6 +65,15 @@ export const RawEventsView: React.FC<RawEventsViewProps> = ({
     }
   };
 
+  const getEventLineCount = (eventJson: string): number => eventJson.split('\n').length;
+
+  const isEventPreviewTruncated = (eventJson: string): boolean => {
+    if (previewLines === 'Full') {
+      return false;
+    }
+    return getEventLineCount(eventJson) > previewLines;
+  };
+
   const getPreviewText = (eventJson: string): string => {
     if (previewLines === 'Full') {
       return eventJson;
@@ -69,7 +82,7 @@ export const RawEventsView: React.FC<RawEventsViewProps> = ({
     if (lines.length <= previewLines) {
       return eventJson;
     }
-    return lines.slice(0, previewLines).join('\n') + '\n...';
+    return lines.slice(0, previewLines).join('\n');
   };
 
   const toggleEvent = (index: number) => {
@@ -152,128 +165,197 @@ export const RawEventsView: React.FC<RawEventsViewProps> = ({
 
   return (
     <EuiPanel paddingSize="s">
-      <EuiFlexGroup justifyContent="spaceBetween" alignItems="center" gutterSize="m">
-        <EuiFlexItem grow={false}>
-          <EuiText size="s" color="subdued">
+      <div
+        style={{
+          border: '1px solid #d3dae6',
+          borderRadius: '4px',
+          overflow: 'hidden',
+          backgroundColor: '#ffffff',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '6px 10px',
+            borderBottom: '1px solid #d3dae6',
+            backgroundColor: '#f5f7fa',
+            fontSize: '12px',
+            color: '#69707d',
+          }}
+        >
+          <div style={{ display: 'flex', gap: '14px' }}>
+            <EuiPopover
+              button={
+                <EuiButtonEmpty
+                  size="xs"
+                  iconType="arrowDown"
+                  iconSide="right"
+                  onClick={() => setIsPreviewMenuOpen((v) => !v)}
+                  flush="both"
+                >
+                  {`Preview lines: ${previewLines}`}
+                </EuiButtonEmpty>
+              }
+              isOpen={isPreviewMenuOpen}
+              closePopover={() => setIsPreviewMenuOpen(false)}
+              panelPaddingSize="s"
+              anchorPosition="downLeft"
+            >
+              <div style={{ maxHeight: '280px', overflowY: 'auto', minWidth: '180px' }}>
+                <EuiContextMenuPanel
+                  size="s"
+                  items={PREVIEW_LINES_OPTIONS.map((option) => {
+                    const value = option.toString();
+                    const selected = previewLines.toString() === value;
+                    return (
+                      <EuiContextMenuItem
+                        key={value}
+                        icon={selected ? 'check' : 'empty'}
+                        onClick={() => {
+                          handlePreviewLinesChange(value);
+                          setIsPreviewMenuOpen(false);
+                        }}
+                      >
+                        {value}
+                      </EuiContextMenuItem>
+                    );
+                  })}
+                />
+              </div>
+            </EuiPopover>
+            <EuiPopover
+              button={
+                <EuiButtonEmpty
+                  size="xs"
+                  iconType="arrowDown"
+                  iconSide="right"
+                  onClick={() => setIsPerPageMenuOpen((v) => !v)}
+                  flush="both"
+                >
+                  {`Events per page: ${eventsPerPage}`}
+                </EuiButtonEmpty>
+              }
+              isOpen={isPerPageMenuOpen}
+              closePopover={() => setIsPerPageMenuOpen(false)}
+              panelPaddingSize="s"
+              anchorPosition="downLeft"
+            >
+              <div style={{ maxHeight: '280px', overflowY: 'auto', minWidth: '180px' }}>
+                <EuiContextMenuPanel
+                  size="s"
+                  items={EVENTS_PER_PAGE_OPTIONS.map((option) => {
+                    const value = option.toString();
+                    const selected = eventsPerPage.toString() === value;
+                    return (
+                      <EuiContextMenuItem
+                        key={value}
+                        icon={selected ? 'check' : 'empty'}
+                        onClick={() => {
+                          handleEventsPerPageChange(value);
+                          setIsPerPageMenuOpen(false);
+                        }}
+                      >
+                        {value}
+                      </EuiContextMenuItem>
+                    );
+                  })}
+                />
+              </div>
+            </EuiPopover>
+            <EuiButtonEmpty
+              size="xs"
+              iconType="download"
+              onClick={exportToCsv}
+              isDisabled={!events || events.length === 0}
+              flush="both"
+            >
+              Export CSV
+            </EuiButtonEmpty>
+          </div>
+          <EuiText size="xs" color="subdued">
             <strong>{totalHits}</strong> {totalHits === 1 ? 'event' : 'events'}
             {events.length < totalHits && ` (showing ${events.length})`}
           </EuiText>
-        </EuiFlexItem>
-        <EuiFlexItem grow={false}>
-          <EuiFormRow label="Preview lines" display="rowCompressed">
-            <EuiSelect
-              value={previewLines.toString()}
-              onChange={(e) => handlePreviewLinesChange(e.target.value)}
-              options={PREVIEW_LINES_OPTIONS.map((option) => ({
-                value: option.toString(),
-                text: option.toString(),
-              }))}
-              compressed
-              style={{ minWidth: '100px' }}
-            />
-          </EuiFormRow>
-        </EuiFlexItem>
-        <EuiFlexItem grow={false}>
-          <EuiFormRow label="Events per page" display="rowCompressed">
-            <EuiSelect
-              value={eventsPerPage.toString()}
-              onChange={(e) => handleEventsPerPageChange(e.target.value)}
-              options={EVENTS_PER_PAGE_OPTIONS.map((option) => ({
-                value: option.toString(),
-                text: option.toString(),
-              }))}
-              compressed
-              style={{ minWidth: '100px' }}
-            />
-          </EuiFormRow>
-        </EuiFlexItem>
-        <EuiFlexItem grow={false}>
-          <EuiButton
-            iconType="download"
-            onClick={exportToCsv}
-            size="s"
-            isDisabled={!events || events.length === 0}
-          >
-            Export CSV
-          </EuiButton>
-        </EuiFlexItem>
-        {totalPages > 1 && (
-          <EuiFlexItem grow={false}>
-            <EuiPagination
-              pageCount={totalPages}
-              activePage={pageIndex}
-              onPageClick={setPageIndex}
-            />
-          </EuiFlexItem>
-        )}
-      </EuiFlexGroup>
-      <EuiSpacer size="s" />
-      <div>
-        {pageEvents.map((event, index) => {
-          const globalIndex = startIndex + index;
-          const isExpanded = expandedEvents.has(globalIndex);
-          const timestamp = getTimestamp(event);
-          const eventJson = formatEvent(event);
+        </div>
+        <div style={{ padding: '8px' }}>
+          {pageEvents.map((event, index) => {
+            const globalIndex = startIndex + index;
+            const isExpanded = expandedEvents.has(globalIndex);
+            const timestamp = getTimestamp(event);
+            const eventJson = formatEvent(event);
 
-          return (
-            <div key={globalIndex} style={{ marginBottom: '8px' }}>
-              <EuiPanel paddingSize="s" style={{ backgroundColor: '#f5f7fa' }}>
-                <EuiFlexGroup direction="column" gutterSize="xs">
-                  <EuiFlexGroup gutterSize="s" alignItems="center" justifyContent="spaceBetween">
-                    <EuiFlexItem grow={false}>
-                      <EuiFlexGroup gutterSize="s" alignItems="center">
-                        {timestamp && (
+            return (
+              <div key={globalIndex} style={{ marginBottom: '8px' }}>
+                <EuiPanel paddingSize="s" style={{ backgroundColor: '#f5f7fa' }}>
+                  <EuiFlexGroup direction="column" gutterSize="xs">
+                    <EuiFlexGroup gutterSize="s" alignItems="center" justifyContent="spaceBetween">
+                      <EuiFlexItem grow={false}>
+                        <EuiFlexGroup gutterSize="s" alignItems="center">
+                          {timestamp && (
+                            <EuiFlexItem grow={false}>
+                              <EuiText size="xs" color="subdued" style={{ fontWeight: 'bold' }}>
+                                {timestamp}
+                              </EuiText>
+                            </EuiFlexItem>
+                          )}
                           <EuiFlexItem grow={false}>
-                            <EuiText size="xs" color="subdued" style={{ fontWeight: 'bold' }}>
-                              {timestamp}
+                            <EuiText size="xs" color="subdued">
+                              #{globalIndex + 1}
                             </EuiText>
                           </EuiFlexItem>
-                        )}
-                        <EuiFlexItem grow={false}>
-                          <EuiText size="xs" color="subdued">
-                            #{globalIndex + 1}
-                          </EuiText>
-                        </EuiFlexItem>
-                      </EuiFlexGroup>
-                    </EuiFlexItem>
-                    <EuiFlexItem grow={false}>
-                      <EuiToolTip content={isExpanded ? 'Collapse' : 'Expand'}>
-                        <EuiButtonIcon
-                          iconType={isExpanded ? 'arrowDown' : 'arrowRight'}
-                          onClick={() => toggleEvent(index)}
-                          aria-label={isExpanded ? 'Collapse event' : 'Expand event'}
-                        />
-                      </EuiToolTip>
+                        </EuiFlexGroup>
+                      </EuiFlexItem>
+                      <EuiFlexItem grow={false}>
+                        <EuiToolTip content={isExpanded ? 'Collapse' : 'Expand'}>
+                          <EuiButtonIcon
+                            iconType={isExpanded ? 'arrowDown' : 'arrowRight'}
+                            onClick={() => toggleEvent(index)}
+                            aria-label={isExpanded ? 'Collapse event' : 'Expand event'}
+                          />
+                        </EuiToolTip>
+                      </EuiFlexItem>
+                    </EuiFlexGroup>
+                    <EuiFlexItem>
+                      {isExpanded ? (
+                        <EuiCodeBlock
+                          language="json"
+                          fontSize="s"
+                          paddingSize="s"
+                          isCopyable
+                          style={{ maxHeight: '400px', overflowY: 'auto' }}
+                        >
+                          {eventJson}
+                        </EuiCodeBlock>
+                      ) : (
+                        <>
+                          <EuiCodeBlock
+                            language="json"
+                            fontSize="s"
+                            paddingSize="s"
+                            isCopyable={false}
+                            style={{ maxHeight: '300px', overflowY: 'auto' }}
+                          >
+                            {getPreviewText(eventJson)}
+                          </EuiCodeBlock>
+                          {isEventPreviewTruncated(eventJson) && (
+                            <EuiLink
+                              onClick={() => toggleEvent(index)}
+                              data-test-subj={`showAllLines-${globalIndex}`}
+                            >
+                              Показать все строки ({getEventLineCount(eventJson)})
+                            </EuiLink>
+                          )}
+                        </>
+                      )}
                     </EuiFlexItem>
                   </EuiFlexGroup>
-                  <EuiFlexItem>
-                    {isExpanded ? (
-                      <EuiCodeBlock
-                        language="json"
-                        fontSize="s"
-                        paddingSize="s"
-                        isCopyable
-                        style={{ maxHeight: '400px', overflowY: 'auto' }}
-                      >
-                        {eventJson}
-                      </EuiCodeBlock>
-                    ) : (
-                      <EuiCodeBlock
-                        language="json"
-                        fontSize="s"
-                        paddingSize="s"
-                        isCopyable={false}
-                        style={{ maxHeight: '300px', overflowY: 'auto' }}
-                      >
-                        {getPreviewText(eventJson)}
-                      </EuiCodeBlock>
-                    )}
-                  </EuiFlexItem>
-                </EuiFlexGroup>
-              </EuiPanel>
-            </div>
-          );
-        })}
+                </EuiPanel>
+              </div>
+            );
+          })}
+        </div>
       </div>
       {totalPages > 1 && (
         <>

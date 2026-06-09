@@ -1,0 +1,16 @@
+{
+  "folders": [
+    {
+      "name": "fdl_plugin",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "git.openRepositoryInParentFolders": "never",
+    "git.autoRepositoryDetection": true,
+    "git.defaultCloneDirectory": "${workspaceFolder}"
+  },
+  "extensions": {
+    "recommendations": []
+  }
+}
