@@ -2,7 +2,7 @@
  * Copyright OpenSearch Contributors
  * SPDX-License-Identifier: Apache-2.0
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   EuiPanel,
   EuiText,
@@ -14,6 +14,7 @@ import {
   EuiFlexGroup,
   EuiFlexItem,
   EuiSpacer,
+  EuiCheckbox,
 } from '@elastic/eui';
 import moment from 'moment';
 
@@ -27,6 +28,29 @@ const DEFAULT_EVENTS_PER_PAGE = 10;
 const EVENTS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200];
 const DEFAULT_PREVIEW_LINES = 10;
 const PREVIEW_LINES_OPTIONS = [5, 10, 15, 20, 30, 50, 100, 'Full'] as const;
+const SELECTED_FIELDS_STORAGE_KEY = 'fdl_plugin:events_selected_fields';
+const DEFAULT_SELECTED_FIELDS = ['message'];
+
+const loadSelectedFields = (): string[] => {
+  if (typeof window === 'undefined') {
+    return DEFAULT_SELECTED_FIELDS;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(SELECTED_FIELDS_STORAGE_KEY);
+    if (!raw) {
+      return DEFAULT_SELECTED_FIELDS;
+    }
+    const saved = JSON.parse(raw);
+    if (!Array.isArray(saved)) {
+      return DEFAULT_SELECTED_FIELDS;
+    }
+    const fields = saved.filter((f): f is string => typeof f === 'string' && f.length > 0);
+    return fields.length > 0 ? fields : DEFAULT_SELECTED_FIELDS;
+  } catch {
+    return DEFAULT_SELECTED_FIELDS;
+  }
+};
 
 export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
   events,
@@ -38,8 +62,22 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
   const [isFieldMenuOpen, setIsFieldMenuOpen] = useState(false);
   const [isPreviewMenuOpen, setIsPreviewMenuOpen] = useState(false);
   const [isPerPageMenuOpen, setIsPerPageMenuOpen] = useState(false);
-  const [selectedDisplayField, setSelectedDisplayField] = useState('message');
-  const [expandedEvents, setExpandedEvents] = useState<Set<number>>(new Set());
+  const [selectedDisplayFields, setSelectedDisplayFields] = useState<string[]>(loadSelectedFields);
+  const [expandedCells, setExpandedCells] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    try {
+      window.localStorage.setItem(
+        SELECTED_FIELDS_STORAGE_KEY,
+        JSON.stringify(selectedDisplayFields)
+      );
+    } catch {
+      // Ignore localStorage write failures.
+    }
+  }, [selectedDisplayFields]);
 
   const { pageEvents, totalPages } = useMemo(() => {
     const safeEvents = events ?? [];
@@ -66,6 +104,14 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
     }
     return ['message', ...allFields.filter((f) => f !== 'message')];
   }, [events]);
+
+  const pickerFields = useMemo(() => {
+    const selected = selectedDisplayFields.filter((f) => displayFields.includes(f));
+    const unselected = displayFields
+      .filter((f) => !selectedDisplayFields.includes(f))
+      .sort((a, b) => a.localeCompare(b));
+    return [...selected, ...unselected];
+  }, [displayFields, selectedDisplayFields]);
 
   const handleEventsPerPageChange = (value: string) => {
     const newPerPage = parseInt(value, 10);
@@ -102,21 +148,52 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
     );
   };
 
-  const renderEventContent = (event: any): { kind: 'field'; text: string } | { kind: 'json'; json: string } => {
-    // Show selected field value; if field is missing, fallback to full JSON.
-    const hasSelectedField = event && Object.prototype.hasOwnProperty.call(event, selectedDisplayField);
-    const fieldValue = hasSelectedField ? event[selectedDisplayField] : undefined;
-
-    if (fieldValue !== undefined && fieldValue !== null) {
-      return { kind: 'field', text: String(fieldValue) };
+  const getFieldDisplayValue = (event: any, fieldName: string): string => {
+    if (!event || !Object.prototype.hasOwnProperty.call(event, fieldName)) {
+      return '';
     }
-
-    try {
-      return { kind: 'json', json: JSON.stringify(event, null, 2) };
-    } catch {
-      return { kind: 'json', json: String(event) };
+    const value = event[fieldName];
+    if (value === null || value === undefined) {
+      return '';
     }
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch {
+        return String(value);
+      }
+    }
+    if (typeof value === 'boolean') {
+      return value.toString();
+    }
+    return String(value);
   };
+
+  const toggleDisplayField = (fieldName: string) => {
+    setSelectedDisplayFields((prev) => {
+      if (prev.includes(fieldName)) {
+        if (prev.length === 1) {
+          return prev;
+        }
+        return prev.filter((f) => f !== fieldName);
+      }
+      return [...prev, fieldName];
+    });
+  };
+
+  const getEventPickerLabel = (): string => {
+    if (selectedDisplayFields.length === 0) {
+      return 'Event: —';
+    }
+    if (selectedDisplayFields.length <= 2) {
+      return `Event: ${selectedDisplayFields.join(', ')}`;
+    }
+    return `Event: ${selectedDisplayFields[0]} (+${selectedDisplayFields.length - 1})`;
+  };
+
+  const gridTemplateColumns = `24px 150px ${selectedDisplayFields
+    .map(() => 'minmax(120px, 1fr)')
+    .join(' ')}`;
 
   const getPreviewText = (text: string): string => {
     if (previewLines === 'Full') return text;
@@ -125,13 +202,17 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
     return lines.slice(0, previewLines).join('\n') + '\n...';
   };
 
-  const toggleExpandedEvent = (eventIndex: number) => {
-    setExpandedEvents((prev) => {
+  const getCellExpandKey = (eventIndex: number, fieldName: string): string =>
+    `${eventIndex}:${fieldName}`;
+
+  const toggleExpandedCell = (eventIndex: number, fieldName: string) => {
+    const key = getCellExpandKey(eventIndex, fieldName);
+    setExpandedCells((prev) => {
       const next = new Set(prev);
-      if (next.has(eventIndex)) {
-        next.delete(eventIndex);
+      if (next.has(key)) {
+        next.delete(key);
       } else {
-        next.add(eventIndex);
+        next.add(key);
       }
       return next;
     });
@@ -151,7 +232,6 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
   const exportToCsv = () => {
     if (!events || events.length === 0) return;
 
-    const exportField = selectedDisplayField;
     const escapeCsvValue = (value: any): string => {
       if (value === null || value === undefined) return '';
       const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
@@ -161,8 +241,10 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
       return stringValue;
     };
 
-    const headers = exportField;
-    const rows = events.map((event) => escapeCsvValue(event?.[exportField]));
+    const headers = selectedDisplayFields.join(',');
+    const rows = events.map((event) =>
+      selectedDisplayFields.map((fieldName) => escapeCsvValue(event?.[fieldName])).join(',')
+    );
     const csvContent = [headers, ...rows].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -209,7 +291,7 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
                   onClick={() => setIsFieldMenuOpen((v) => !v)}
                   flush="both"
                 >
-                  {`Event: ${selectedDisplayField}`}
+                  {getEventPickerLabel()}
                 </EuiButtonEmpty>
               }
               isOpen={isFieldMenuOpen}
@@ -217,22 +299,22 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
               panelPaddingSize="s"
               anchorPosition="downLeft"
             >
-              <div style={{ maxHeight: '280px', overflowY: 'auto', minWidth: '220px' }}>
-                <EuiContextMenuPanel
-                  size="s"
-                  items={displayFields.map((fieldName) => (
-                    <EuiContextMenuItem
-                      key={fieldName}
-                      icon={selectedDisplayField === fieldName ? 'check' : 'empty'}
-                      onClick={() => {
-                        setSelectedDisplayField(fieldName);
-                        setIsFieldMenuOpen(false);
-                      }}
-                    >
-                      {fieldName}
-                    </EuiContextMenuItem>
-                  ))}
-                />
+              <div style={{ maxHeight: '280px', overflowY: 'auto', minWidth: '220px', padding: '8px' }}>
+                {pickerFields.map((fieldName) => {
+                  const isSelected = selectedDisplayFields.includes(fieldName);
+                  const isOnlySelected = isSelected && selectedDisplayFields.length === 1;
+                  return (
+                    <div key={fieldName} style={{ padding: '2px 0' }}>
+                      <EuiCheckbox
+                        id={`event-field-${fieldName}`}
+                        label={fieldName}
+                        checked={isSelected}
+                        disabled={isOnlySelected}
+                        onChange={() => toggleDisplayField(fieldName)}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </EuiPopover>
             <EuiPopover
@@ -328,7 +410,7 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '24px 150px 1fr',
+            gridTemplateColumns,
             gap: '0',
             borderBottom: '1px solid #d3dae6',
             backgroundColor: '#f5f7fa',
@@ -339,26 +421,27 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
         >
           <div style={{ padding: '6px 8px' }}>i</div>
           <div style={{ padding: '6px 10px', borderLeft: '1px solid #e5e9f0' }}>Time</div>
-          <div style={{ padding: '6px 10px', borderLeft: '1px solid #e5e9f0' }}>Event</div>
+          {selectedDisplayFields.map((fieldName) => (
+            <div
+              key={fieldName}
+              style={{ padding: '6px 10px', borderLeft: '1px solid #e5e9f0' }}
+              title={fieldName}
+            >
+              {fieldName}
+            </div>
+          ))}
         </div>
 
         {pageEvents.map((event, idx) => {
           const globalIndex = pageIndex * eventsPerPage + idx;
           const timestamp = getTimestamp(event) || '-';
-          const content = renderEventContent(event);
-          const fullText = content.kind === 'field' ? content.text : content.json;
-          const totalLines = fullText.split('\n').length;
-          const isExpanded = expandedEvents.has(globalIndex);
-          const isTruncationPossible = previewLines !== 'Full' && totalLines > (previewLines as number);
-          const renderedText =
-            isExpanded || previewLines === 'Full' ? fullText : getPreviewText(fullText);
 
           return (
             <div
               key={globalIndex}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '24px 150px 1fr',
+                gridTemplateColumns,
                 gap: '0',
                 borderBottom: '1px solid #eef1f7',
               }}
@@ -386,31 +469,51 @@ export const EventsMessagesView: React.FC<EventsMessagesViewProps> = ({
               >
                 {renderTimestamp(timestamp)}
               </div>
-              <div
-                style={{
-                  padding: '8px 10px',
-                  fontFamily:
-                    '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace',
-                  fontSize: '12px',
-                  lineHeight: 1.35,
-                  color: '#343741',
-                  overflowX: 'auto',
-                  borderLeft: '1px solid #eef1f7',
-                }}
-              >
-                {renderAsLines(renderedText)}
-                {isTruncationPossible && (
-                  <div style={{ marginTop: '4px' }}>
-                    <EuiButtonEmpty
-                      size="xs"
-                      flush="left"
-                      onClick={() => toggleExpandedEvent(globalIndex)}
-                    >
-                      {isExpanded ? 'Show less' : `Show all ${totalLines} lines`}
-                    </EuiButtonEmpty>
+              {selectedDisplayFields.map((fieldName) => {
+                const fullText = getFieldDisplayValue(event, fieldName);
+                const totalLines = fullText ? fullText.split('\n').length : 0;
+                const cellKey = getCellExpandKey(globalIndex, fieldName);
+                const isExpanded = expandedCells.has(cellKey);
+                const isTruncationPossible =
+                  previewLines !== 'Full' && totalLines > (previewLines as number);
+                const renderedText =
+                  isExpanded || previewLines === 'Full' ? fullText : getPreviewText(fullText);
+
+                return (
+                  <div
+                    key={fieldName}
+                    style={{
+                      padding: '8px 10px',
+                      fontFamily:
+                        '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace',
+                      fontSize: '12px',
+                      lineHeight: 1.35,
+                      color: '#343741',
+                      overflowX: 'auto',
+                      borderLeft: '1px solid #eef1f7',
+                    }}
+                  >
+                    {fullText ? (
+                      <>
+                        {renderAsLines(renderedText)}
+                        {isTruncationPossible && (
+                          <div style={{ marginTop: '4px' }}>
+                            <EuiButtonEmpty
+                              size="xs"
+                              flush="left"
+                              onClick={() => toggleExpandedCell(globalIndex, fieldName)}
+                            >
+                              {isExpanded ? 'Show less' : `Show all ${totalLines} lines`}
+                            </EuiButtonEmpty>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <span style={{ color: '#98a2b3' }}>—</span>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })}
             </div>
           );
         })}
