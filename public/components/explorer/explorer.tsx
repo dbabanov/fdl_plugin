@@ -24,7 +24,8 @@ import { DataGrid } from './data_grid';
 import { RawEventsView } from './raw_events_view';
 import { EventsMessagesView } from './events_messages_view';
 import { Timeline } from './timeline';
-import { preprocessQuery } from '../../utils/ppl_query_utils';
+import { preprocessQueryWithDetails } from '../../utils/ppl_query_utils';
+import { logPplQueryToConsole, logPplQueryToServer } from '../../utils/ppl_query_logger';
 
 interface IField {
   name: string;
@@ -74,8 +75,6 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
     };
   };
 
-  const TIME_FILTER_FIELD = '@timestamp';
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -121,22 +120,24 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
         );
       }
 
-      // Build the query with time range filter.
-      // Requirement: always use @timestamp for the time filter injection.
-      const queryWithTimeFilter = preprocessQuery({
+      const queryDetails = preprocessQueryWithDetails({
         rawQuery: tempQuery.trim(),
         startTime,
         endTime,
-        timeField: TIME_FILTER_FIELD,
       });
 
-      // Log the query being executed
-      console.log('[FDL Plugin] Executing PPL Query:', queryWithTimeFilter);
-      console.log('[FDL Plugin] Time filter applied using field:', TIME_FILTER_FIELD);
-      console.log('[FDL Plugin] Time range:', { startTime, endTime });
+      logPplQueryToConsole(queryDetails);
+      logPplQueryToServer(http, queryDetails);
+
+      if (queryDetails.strategy === 'missing_source') {
+        notifications.toasts.addWarning({
+          title: 'Missing source in query',
+          text: 'PPL search requires source=<index> in the query. Time modifiers were not applied.',
+        });
+      }
 
       const response = await pplService.fetch({
-        query: queryWithTimeFilter,
+        query: queryDetails.finalQuery,
         format: 'jdbc',
       });
 
@@ -209,6 +210,7 @@ export const Explorer: React.FC<ExplorerProps> = ({ http, notifications }) => {
             <EventsMessagesView
               events={explorerData.jsonData}
               totalHits={explorerData.total || explorerData.datarows.length}
+              availableFields={availableFields}
             />
           ) : (
             <EuiPanel>

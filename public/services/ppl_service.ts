@@ -23,6 +23,9 @@ export default class PPLService {
     dataSourceMDSId?: string,
     errorHandler?: (error: any) => void
   ) => {
+    // eslint-disable-next-line no-console
+    console.log('[FDL Plugin] POST /api/ppl/search', params);
+
     return this.http
       .post(`${PPL_BASE}${PPL_SEARCH}`, {
         body: JSON.stringify(params),
